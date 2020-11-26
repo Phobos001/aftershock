@@ -246,7 +246,7 @@ impl Rasterizer {
     /// let rasterizer = Rasterizer::new(384, 216, false);
     /// ```
     pub fn new(width: usize, height: usize) -> Rasterizer {
-        println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4) + { width * height * 8 });
+        println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
             framebuffer: FrameBuffer::new(width, height),
@@ -490,11 +490,11 @@ impl Rasterizer {
             self.pline(xc+y, yc-x, xc-y, yc-x, color);
         }
 
-        while (y >= x)
+        while y >= x
         { 
             x += 1; 
       
-            if (d > 0)  { 
+            if d > 0  { 
                 y -= 1;  
                 d = d + 4 * (x - y) + 10; 
             } else {
@@ -544,6 +544,70 @@ impl Rasterizer {
         }
     }
 
+    pub fn pimgmtx(&mut self, image: &Image, position: Vec2, rotation: f32, scale: Vec2, offset: Vec2, camera_space: bool) {
+        let mtx_o = Mat3::translated(offset);
+        let mtx_r = Mat3::rotated(rotation);
+        let mtx_p = Mat3::translated(position);
+        let mtx_s = Mat3::scaled(scale);
+
+        let cmtx = if camera_space {
+            self.mtx * (mtx_p * mtx_r * mtx_s * mtx_o)
+        } else {
+            mtx_p * mtx_r * mtx_s * mtx_o
+        };
+
+        // We have to get the rotated bounding box of the rotated sprite in order to draw it correctly without blank pixels
+        let start_center: Vec2 = cmtx.forward(Vec2::zero());
+        let (mut sx, mut sy, mut ex, mut ey) = (start_center.x, start_center.y, start_center.x, start_center.y);
+
+        // Top-Left Corner
+        let p1: Vec2 = cmtx.forward(Vec2::zero());
+        sx = f32::min(sx, p1.x); sy = f32::min(sy, p1.y);
+        ex = f32::max(ex, p1.x); ey = f32::max(ey, p1.y);
+
+        // Bottom-Right Corner
+        let p2: Vec2 = cmtx.forward(Vec2::new(image.width as f32, image.height as f32));
+        sx = f32::min(sx, p2.x); sy = f32::min(sy, p2.y);
+        ex = f32::max(ex, p2.x); ey = f32::max(ey, p2.y);
+
+        // Bottom-Left Corner
+        let p3: Vec2 = cmtx.forward(Vec2::new(0.0, image.height as f32));
+        sx = f32::min(sx, p3.x); sy = f32::min(sy, p3.y);
+        ex = f32::max(ex, p3.x); ey = f32::max(ey, p3.y);
+
+        // Top-Right Corner
+        let p4: Vec2 = cmtx.forward(Vec2::new(image.width as f32, 0.0));
+        sx = f32::min(sx, p4.x); sy = f32::min(sy, p4.y);
+        ex = f32::max(ex, p4.x); ey = f32::max(ey, p4.y);
+
+        let mut rsx = sx as i32;
+        let mut rsy = sy as i32;
+        let mut rex = ex as i32;
+        let mut rey = ey as i32;
+
+        // Sprite isn't even in frame, don't draw anything
+        if (rex < 0 || rsx > self.framebuffer.width as i32) && (rey < 0 || rsy > self.framebuffer.height as i32) { return; }
+
+        // Okay but clamp the ranges in frame so we're not wasting time on stuff offscreen
+        if rsx < 0 { rsx = 0;}
+        if rsy < 0 { rsy = 0;}
+        if rex > self.framebuffer.width as i32 { rex = self.framebuffer.width as i32; }
+        if rey > self.framebuffer.height as i32 { rey = self.framebuffer.height as i32; }
+
+        let cmtx_inv = cmtx.clone().inv();
+
+		// We can finally draw!
+		// Noticed some weird clipping on the right side of sprites, like the BB isn't big enough? Just gonna add some more pixels down and right just in case
+        for ly in rsy..rey+8 {
+            for lx in rsx..rex+8 {
+                // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
+                let ip: Vec2 = cmtx_inv.forward(Vec2::new(lx as f32, ly as f32));
+                let color: Color = image.pget(ip.x as i32, ip.y as i32);
+                self.pset(lx as i32, ly as i32, color);
+            }
+        }
+    }
+
     pub fn pprint(&mut self, font: &Font, text: String, x: i32, y: i32) {
         let mut jumpx: isize = 0;
         let mut jumpy: isize = 0;
@@ -566,30 +630,6 @@ impl Rasterizer {
                 }
             }
         }
-    }
-
-    /// Pre-rasterizes printable text, returning an image that can be redisplayed, attached to a sprite, or transformed
-    /// in any other way. This allocates a rasterizer with a framebuffer in function scope and you should not use this every frame.
-    /// For constantly changing text, you should have a dedicated rasterizer and use FrameBuffers to_image_buffer instead.
-    pub fn pprint_to_img(&mut self, font: &Font, text: String, x: i32, y: i32) -> Option<Image> {
-        let mut jumpx: isize = 0;
-        let mut jumpy: isize = 0;
-        let chars: Vec<char> = text.chars().collect();
-
-        for i in 0..chars.len() {
-            if chars[i] == '\n' { jumpy += font.glyph_height as isize; jumpx = 0; continue; }
-            if chars[i] == ' ' { jumpx += font.glyph_width as isize; continue; }
-        }
-
-        let max_width = jumpx as i32 + font.glyph_width as i32;
-        let max_height = jumpy as i32 + font.glyph_height as i32;
-
-        if max_width <= 0 || max_height <= 0 { return None; }
-
-        let mut textrast = Rasterizer::new(max_width as usize, max_height as usize);
-        textrast.pprint(font, text, x, y);
-        let image = textrast.framebuffer.to_image();
-        return Some(image);
     }
 
     pub fn ptriline(&mut self,v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
@@ -650,13 +690,13 @@ impl Rasterizer {
         let vl23_len = vl23.len();
 
         for i in 0..vl12_len {
-            all_pixels.push((vl12[i].0, vl12[i].1, lerpf(v1u, v2u, (i as f32 / vl12_len as f32)), lerpf(v1v, v2v, (i as f32 / vl12_len as f32))));
+            all_pixels.push((vl12[i].0, vl12[i].1, lerpf(v1u, v2u, i as f32 / vl12_len as f32), lerpf(v1v, v2v, i as f32 / vl12_len as f32)));
         }
         for i in 0..vl13_len {
-            all_pixels.push((vl13[i].0, vl13[i].1, lerpf(v1u, v3u, (i as f32 / vl13_len as f32)), lerpf(v1v, v3v, (i as f32 / vl13_len as f32))));
+            all_pixels.push((vl13[i].0, vl13[i].1, lerpf(v1u, v3u, i as f32 / vl13_len as f32), lerpf(v1v, v3v, i as f32 / vl13_len as f32)));
         }
         for i in 0..vl23_len {
-            all_pixels.push((vl23[i].0, vl23[i].1, lerpf(v3u, v3u, (i as f32 / vl23_len as f32)), lerpf(v2v, v3v, (i as f32 / vl23_len as f32))));
+            all_pixels.push((vl23[i].0, vl23[i].1, lerpf(v3u, v3u, i as f32 / vl23_len as f32), lerpf(v2v, v3v, i as f32 / vl23_len as f32)));
         }
 
         // Sort by row

@@ -29,7 +29,7 @@ impl Color {
 		let dst_bf32 = dst.b as f32 / 255.0;
 		let dst_af32 = dst.a as f32 / 255.0;
 
-		let fa = (src_af32 + dst_af32 * (1.0 - src_af32));
+		let fa = src_af32 + dst_af32 * (1.0 - src_af32);
 		let fr = (src_rf32 * src_af32 + dst_rf32 * (1.0 - src_af32)) / fa;
 		let fg = (src_gf32 * src_af32 + dst_gf32 * (1.0 - src_af32)) / fa;
 		let fb = (src_bf32 * src_af32 + dst_bf32 * (1.0 - src_af32)) / fa;

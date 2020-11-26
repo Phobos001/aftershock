@@ -11,8 +11,8 @@ use std::io::{Cursor, Read};
 
 
 pub struct Audio {
-	stream: rodio::OutputStream,
-	stream_handle: rodio::OutputStreamHandle,
+	_stream: rodio::OutputStream,
+	_stream_handle: rodio::OutputStreamHandle,
     clips: HashMap<&'static str, Buffered<Decoder<Cursor<Vec<u8>>>>>,
     channels: Vec<Sink>,
     current_channel: usize,
@@ -20,15 +20,15 @@ pub struct Audio {
 
 impl Audio {
     pub fn new(max_audio_channels: u8) -> Self {
-        let (stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let (_stream, _stream_handle) = rodio::OutputStream::try_default().unwrap();
         let clips = HashMap::new();
         let mut channels: Vec<Sink> = Vec::new();
         for _ in 0..max_audio_channels {
-            channels.push(Sink::try_new(&stream_handle).unwrap());
+            channels.push(Sink::try_new(&_stream_handle).unwrap());
         }
         Self {
-			stream,
-			stream_handle,
+			_stream,
+			_stream_handle,
             clips,
             channels,
             current_channel: 0,

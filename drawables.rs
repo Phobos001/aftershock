@@ -1,87 +1,125 @@
 use crate::all::*;
 
 pub struct Sprite<'a> {
-	pub mtx: Mat3,
+    pub tint: Color,
+    pub opacity: f32,
 	pub offset: Vec2,
 	pub image: &'a Image,
 	pub position: Vec2,
 	pub rotation: f32,
 	pub scale: Vec2,
-	pub depth: f64,
 }
 
 impl<'a> Sprite<'a> {
-	pub fn new(image: &'a Image, x: f32, y: f32, a: f32, sx: f32, sy: f32, depth: f64) -> Sprite {
+	pub fn new(image: &'a Image, x: f32, y: f32, a: f32, sx: f32, sy: f32, tint: Color) -> Sprite {
 		Sprite {
-			image,
+            image,
+            tint,
+            opacity: 1.0,
 			offset: Vec2::new(-(image.width as f32) / 2.0, -(image.height as f32) / 2.0),
 			position: Vec2::new(x, y),
 			rotation: a,
 			scale: Vec2::new(sx, sy),
-			mtx: Mat3::identity(),
-			depth,
 		}
 	}
 
 	pub fn draw(&self, rasterizer: &mut Rasterizer) {
-		let mtx_o = Mat3::translated(self.offset);
-        let mtx_r = Mat3::rotated(self.rotation);
-        let mtx_p = Mat3::translated(self.position);
-        let mtx_s = Mat3::scaled(self.scale);
+        rasterizer.tint = self.tint;
+        rasterizer.opacity = self.opacity;
+        rasterizer.pimgmtx(self.image, self.position, self.rotation, self.scale, self.offset, true);
+        rasterizer.opacity = 1.0;
+        rasterizer.tint = Color::white();
+	}
+}
 
-        let cmtx = rasterizer.mtx * (mtx_p * mtx_r * mtx_s * mtx_o);
+pub struct SpriteFontGlyph {
+    pub glyph: char,
+    pub image: Image,
+}
 
-        // We have to get the rotated bounding box of the rotated sprite in order to draw it correctly without blank pixels
-        let start_center: Vec2 = cmtx.forward(Vec2::zero());
-        let (mut sx, mut sy, mut ex, mut ey) = (start_center.x, start_center.y, start_center.x, start_center.y);
+pub struct SpriteFont {
+    pub glyphs: Vec<SpriteFontGlyph>,
+    pub glyphidx: Vec<char>,
+    pub text: String,
+    pub spacing_horizontal: f32,
+    pub spacing_vertical: f32,
 
-        // Top-Left Corner
-        let p1: Vec2 = cmtx.forward(Vec2::zero());
-        sx = f32::min(sx, p1.x); sy = f32::min(sy, p1.y);
-        ex = f32::max(ex, p1.x); ey = f32::max(ey, p1.y);
+    pub tint: Color,
+    pub opacity: f32,
 
-        // Bottom-Right Corner
-        let p2: Vec2 = cmtx.forward(Vec2::new(self.image.width as f32, self.image.height as f32));
-        sx = f32::min(sx, p2.x); sy = f32::min(sy, p2.y);
-        ex = f32::max(ex, p2.x); ey = f32::max(ey, p2.y);
+    pub position: Vec2,
+    pub scale: Vec2,
+    pub rotation: f32,
+    pub offset: Vec2,
+}
 
-        // Bottom-Left Corner
-        let p3: Vec2 = cmtx.forward(Vec2::new(0.0, self.image.height as f32));
-        sx = f32::min(sx, p3.x); sy = f32::min(sy, p3.y);
-        ex = f32::max(ex, p3.x); ey = f32::max(ey, p3.y);
+impl SpriteFont {
+    pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing_horizontal: f32, glyph_spacing_vertical: f32) -> SpriteFont {
+        let font = Font::new(path_image, glyphidxstr, glyph_width, glyph_height, 0);
+        if font.fontimg.buffer.len() <= 0 {
+            println!("ERROR - SPRITEFONT: Font {} could not be loaded due to a missing image!", path_image);
+        }
 
-        // Top-Right Corner
-        let p4: Vec2 = cmtx.forward(Vec2::new(self.image.width as f32, 0.0));
-        sx = f32::min(sx, p4.x); sy = f32::min(sy, p4.y);
-        ex = f32::max(ex, p4.x); ey = f32::max(ey, p4.y);
+        let mut font_splitter: Rasterizer = Rasterizer::new(font.glyph_width, font.glyph_height);
+        let mut generated_glpyhs: Vec<SpriteFontGlyph> = Vec::new();
+        let glyphidx: Vec<char> = font.glyphidx.clone();
+        for c in &font.glyphidx {
+            font_splitter.cls();
+            font_splitter.pprint(&font, c.to_string(), 0, 0);
+            let rasterized_char = font_splitter.framebuffer.to_image();
+            generated_glpyhs.push(
+                SpriteFontGlyph {
+                    glyph: *c,
+                    image: rasterized_char,
+                }
+            )
+        }
+        SpriteFont {
+            glyphs: generated_glpyhs,
+            glyphidx,
+            text: "".to_string(),
+            spacing_horizontal: glyph_spacing_horizontal,
+            spacing_vertical: glyph_spacing_vertical,
 
-        let mut rsx = sx as i32;
-        let mut rsy = sy as i32;
-        let mut rex = ex as i32;
-        let mut rey = ey as i32;
+            tint: Color::white(),
+            opacity: 1.0,
 
-        // Sprite isn't even in frame, don't draw anything
-        if (rex < 0 || rsx > rasterizer.framebuffer.width as i32) && (rey < 0 || rsy > rasterizer.framebuffer.height as i32) { return; }
+            position: Vec2::zero(),
+            scale: Vec2::one(),
+            rotation: 0.0,
+            offset: Vec2::zero(),
+        }
+    }
 
-        // Okay but clamp the ranges in frame so we're not wasting time on stuff offscreen
-        if rsx < 0 { rsx = 0;}
-        if rsy < 0 { rsy = 0;}
-        if rex > rasterizer.framebuffer.width as i32 { rex = rasterizer.framebuffer.width as i32; }
-        if rey > rasterizer.framebuffer.height as i32 { rey = rasterizer.framebuffer.height as i32; }
+    pub fn draw(&self, rasterizer: &mut Rasterizer) {
+        let mut jumpx: f32 = 0.0;
+        let mut jumpy: f32 = 0.0;
+        let chars: Vec<char> = self.text.chars().collect();
 
-        let cmtx_inv = cmtx.clone().inv();
+        for i in 0..chars.len() {
+            if chars[i] == '\n' { jumpy += self.spacing_vertical; jumpx = 0.0; continue; }
+            if chars[i] == ' ' { jumpx += self.spacing_horizontal; continue; }
+            for j in 0..self.glyphs.len() {
+                if self.glyphs[j].glyph == chars[i] {
+                    rasterizer.set_draw_mode(DrawMode::Alpha);
+                    rasterizer.tint = self.tint;
+                    rasterizer.opacity = self.opacity;
+                    rasterizer.pimgmtx(&self.glyphs[j].image, 
+                self.position + Vec2::new(jumpx, jumpy),
+                        self.rotation,
+                        self.scale,
+                        self.offset,
+            true);
+                    rasterizer.set_draw_mode(DrawMode::Alpha);
+                    rasterizer.tint = Color::white();
+                    rasterizer.opacity = 1.0;
+                    
 
-		// We can finally draw!
-		// Noticed some weird clipping on the right side of sprites, like the BB isn't big enough? Just gonna add some more pixels down and right just in case
-        for ly in rsy..rey+8 {
-            for lx in rsx..rex+8 {
-                // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
-                let ip: Vec2 = cmtx_inv.forward(Vec2::new(lx as f32, ly as f32));
-                let color: Color = self.image.pget(ip.x as i32, ip.y as i32);
-                rasterizer.pset(lx as i32, ly as i32, color);
+                    jumpx += self.glyphs[j].image.width as f32 + self.spacing_horizontal;
+                }
             }
         }
-	}
+    }
 }
 
 pub struct Line {

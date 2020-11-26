@@ -24,13 +24,13 @@ impl PolyRasterizer {
 		let mut w: usize = 0;
 		let mut h: usize = 0;
 
-		if (width > height) { // Horizontal Screen
+		if width > height { // Horizontal Screen
 			w = width;
 			h = height;
-		} else if (width < height) { // Vertical Screen
+		} else if width < height { // Vertical Screen
 			w = height;
 			h = width;
-		} else if (width == height) { // Square Screen
+		} else if width == height { // Square Screen
 			w = width;
 			h = width;
 		}

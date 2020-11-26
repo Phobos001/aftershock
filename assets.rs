@@ -102,7 +102,7 @@ impl Font {
 		let fontimg: Image = Image::new(path_image);
 
 		if fontimg.buffer.len() <= 0 {
-			println!("ERROR - FONT: Font image {} does not exist!", path_image);
+			println!("ERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
 		}
 
 		println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);

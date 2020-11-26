@@ -27,10 +27,6 @@ pub struct AABB {
 }
 
 impl AABB {
-	pub fn debug_drawlines(&self, rasterizer: &mut Rasterizer, color: Color) {
-		// Gotta make it with the transformed lines
-	}
-
 	pub fn new(position: Vec2, extents: Vec2) -> AABB {
 		AABB {
 			position,
@@ -176,37 +172,5 @@ impl AABB {
 		}
 	}
 
-	pub fn overlap_sweep(aabb1: &AABB, aabb2: &AABB, moving_delta: Vec2) -> bool {
-		if moving_delta.x != 0.0 && moving_delta.y != 0.0 {
-			AABB::overlap_line(aabb1, aabb1.position, aabb2.position, aabb1.extents)
-		} else {
-			AABB::overlaps_aabb(aabb1, aabb2)
-		}
-	}
-
-	pub fn resolution_sweep(aabb1: &AABB, aabb2: &AABB, moving_delta: Vec2) -> Option<Resolution> {
-		if moving_delta.x != 0.0 && moving_delta.y != 0.0 {
-			let raytest = AABB::resolution_line(aabb1, aabb1.position, aabb2.position, aabb2.extents);
-			match raytest {
-				Some(resolution) => {
-					let mut sweep = resolution;
-					sweep.time = clampf(sweep.time, 0.0, 1.0);
-					sweep.point = aabb2.position + moving_delta * sweep.time;
-					let direction = moving_delta.clone().normalized();
-
-					sweep.point = Vec2::new(
-						clampf(sweep.point.x + direction.x * aabb2.extents.x, aabb1.position.x - aabb1.position.x, aabb1.position.x + aabb1.position.x),
-						clampf(sweep.point.y + direction.y * aabb2.extents.y, aabb1.position.y - aabb1.position.y, aabb1.position.y + aabb1.position.y)
-					);
-
-					Some(sweep)
-				},
-				None => {
-					None
-				}
-			}
-		} else {
-			AABB::resolution_aabb(aabb1, aabb2)
-		}
-	}
+	// TODO: Add a raycast resolution method for moving AABBs (Cast AABB and set position to hit point before resolving AABB)
 }
