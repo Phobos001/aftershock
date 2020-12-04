@@ -1,9 +1,14 @@
 [package]
 name    = "aftershock"
 version = "0.0.9"
-authors = ["Phobos001"]
+authors = ["Keinan Powers / Phobos001"]
 edition = "2018"
+catagories = "graphics"
+keywords = ["graphics", "software rendering", "gamedev"]
 description = "Software Rendering Graphics API written in pure rust"
+license = "MIT"
+repository = "https://github.com/Phobos001/aftershock"
+readme = "README.md"
 
 [lib]
 name = "aftershock"
