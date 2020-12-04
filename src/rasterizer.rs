@@ -210,8 +210,7 @@ fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
-/// Drawing switchboard that draws directly into a framebuffer. Contains a variety of drawing functions as methods, but custom drawing functions
-/// can be created if one desires.
+/// Drawing switchboard that draws directly into a framebuffer. Drawing options like Tint and Opacity must be manually changed by the user.
 pub struct Rasterizer {
     pset_op: PSetOp,
     pub framebuffer: FrameBuffer,
@@ -231,12 +230,9 @@ impl Rasterizer {
 
     /// Makes a new Rasterizer to draw to a screen-sized buffer
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use aftershock::rasterizer::Rasterizer;
-    /// let rasterizer = Rasterizer::new(384, 216, false);
-    /// ```
+    /// # Arguments
+    /// * 'width' - Horizontal size of the framebuffer.
+    /// * 'height' - Vertical size of the framebuffer.
     pub fn new(width: usize, height: usize) -> Rasterizer {
         println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
@@ -255,6 +251,8 @@ impl Rasterizer {
     }
 
     /// Sets the rasterizers drawing mode for incoming pixels. Should be defined before every drawing operation.
+    /// # Arguments
+    /// * 'mode' - Which drawing function should the Rasterizer use.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
             DrawMode::Opaque => {self.pset_op = pset_opaque;},
@@ -274,6 +272,8 @@ impl Rasterizer {
     }
 
     /// Clears the screen to a color.
+    /// # Arguments
+    /// * 'color' - Color the screen should be cleared too.
     pub fn cls_color(&mut self, color: Color) {
         self.framebuffer.color.chunks_exact_mut(4).for_each(|c| {
             c[0] = color.r;

@@ -1,3 +1,4 @@
+/// 32-bit Color using  1-byte channels for Red, Green, Blue, and Alpha.
 #[derive(Debug, Copy, Clone)]
 pub struct Color {
 	pub r: u8,
@@ -42,7 +43,8 @@ impl Color {
 		Color { r, g, b, a}
 	}
 
-	/// Faster but lest accurate alpha-blending function. https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
+	/// Faster but lest accurate alpha-blending function. Recommended for performance
+	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
 		if src.a <= 0 { return Color::clear(); }
 

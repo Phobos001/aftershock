@@ -1,13 +1,13 @@
 [package]
 name    = "aftershock"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Phobos001"]
 edition = "2018"
-description = "Software Rendering Graphics API and Game Framework written in Rust."
+description = "Software Rendering Graphics API written in pure rust"
 
 [lib]
 name = "aftershock"
-path = "lib.rs"
+path = "src/lib.rs"
 crate-type = ["lib"]
 
 [dependencies]

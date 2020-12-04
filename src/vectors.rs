@@ -1,5 +1,6 @@
 use crate::math::*;
 
+/// Two-dimensional floating-point Vector to be used as either a position or direction.
 #[derive(Copy, Clone, Debug)]
 pub struct Vec2 {
 	pub x: f32,

@@ -10,6 +10,10 @@ pub fn signf(value: f32) -> f32 {
 	if value > 0.0 { 1.0 } else if value < 0.0 { -1.0 } else { 0.0 }
 }
 
+pub fn signi(value: i32) -> i32 {
+	if value > 0 { 1 } else if value < 0 { -1 } else { 0 }
+}
+
 pub fn lerpf(a: f32, b: f32, t: f32) -> f32 {
 	a + (b - a) * t
 }
@@ -18,20 +22,20 @@ pub fn lerpi(a: i32, b: i32, t: f32) -> i32 {
 	((a + (b - a)) as f32 * t).floor() as i32
 }
 
-pub fn dist2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32{
-	((x1 - x0).powf(2.0) + (y1 - y0).powf(2.0)).sqrt()
-}
-
-pub fn dist3(x0: f32, y0: f32, z0: f32, x1: f32, y1: f32, z1: f32) -> f32{
-	((x1 - x0).powf(2.0) + (y1 - y0).powf(2.0) + (z1 - z0).powf(2.0)).sqrt()
-}
-
 pub fn dot2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
 	x0 * x1 + y0 * y1
 }
 
 pub fn cross2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
 	(x0 * y1) - (y0 * x1)
+}
+
+pub fn dist2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32{
+	((x1 - x0).powf(2.0) + (y1 - y0).powf(2.0)).sqrt()
+}
+
+pub fn dist3(x0: f32, y0: f32, z0: f32, x1: f32, y1: f32, z1: f32) -> f32{
+	((x1 - x0).powf(2.0) + (y1 - y0).powf(2.0) + (z1 - z0).powf(2.0)).sqrt()
 }
 
 pub fn barycentric2(v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> (f32, f32, f32) {

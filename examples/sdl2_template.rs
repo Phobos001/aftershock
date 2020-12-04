@@ -65,7 +65,7 @@ impl TemplateEngine {
             fps: 0,
             fps_print: 0,
 
-            game_hz: 9999, // Controls how often things are updated
+            game_hz: 300, // Controls how often things are updated
             game_hz_timer: 0.0,
 		}
 	}
@@ -121,6 +121,7 @@ impl TemplateEngine {
         let _ = canvas.set_logical_size(RENDER_WIDTH as u32, RENDER_HEIGHT as u32);
         let texture_creator = canvas.texture_creator();
 
+        // This is what we update our buffers to
         let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA32, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
             .map_err(|e| e.to_string()).unwrap();
 
@@ -136,8 +137,14 @@ impl TemplateEngine {
         let sysfont: Font = Font::new("core/tiny_font.png", font_glyphidx, 5, 5, -1);
 
         // Spritefont example. More flexible than the standard pprint but also more expensive.
-        let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 0.0, 8.0);
+        let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 8.0);
         spritefont_test.position = Vec2::new(256.0, 128.0);
+
+        // Image example
+        let scotty = Image::new("core/scotty_transparent.png");
+
+        // Image example for transparency
+        let graphics_and_shit = Image::new("core/default.png");
 
         let mut printtime: f32 = 0.0;
 
@@ -171,8 +178,19 @@ impl TemplateEngine {
                 // High level spritefont example
                 spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
                 spritefont_test.scale = Vec2::one() * self.realtime.cos();
-                spritefont_test.text = "WEEEEEEE WOOOOW WEEEEEEE\nDAAAAMMNNNNNNNSONNNNN\nWOOAAHHHHHHHH!!!!!!!!11!!1!!!".to_string();
+                spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
                 spritefont_test.draw(&mut self.rasterizer);
+
+                // Image drawing
+                self.rasterizer.pimg(&scotty, 64, 64);
+
+                // Image drawing but T R A N S P A R E N T
+                self.rasterizer.set_draw_mode(DrawMode::Alpha);
+                self.rasterizer.opacity = 128;
+                self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
+                self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
+                self.rasterizer.opacity = 255;
+                self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
                 let total_pixels = self.rasterizer.drawn_pixels_since_cls;
                 self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);

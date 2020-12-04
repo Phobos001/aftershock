@@ -1,6 +1,6 @@
 use crate::vectors::*;
 
-// ==============================
+/// 3x3 Matrix mainly for transforming 2D images, but can be used for anything.
 #[derive(Copy, Clone, Debug)]
 pub struct Mat3 {
 	m: [[f32; 3]; 3],
@@ -17,8 +17,7 @@ impl Mat3 {
 		}
 	}
 
-	// Just throw points in here after doing some combination transforms, it's great!
-	// If you do this on an identity matrix it will zero them out.
+	/// Receives a 2D Vector and returns a transformed copy of it.
 	pub fn forward(&self, in_vec: Vec2) -> Vec2 {
 		let mut out = Vec2::new(0.0, 0.0);
 		out.x = in_vec.x * self.m[0][0] + in_vec.y * self.m[1][0] + self.m[2][0];
@@ -26,30 +25,7 @@ impl Mat3 {
 		return out;
 	}
 
-	// Translates in place
-	pub fn translate(&mut self, v: Vec2) {
-		self.m[2][0] = v.x;
-		self.m[2][1] = v.y;
-	}
-
-	// Rotates in place
-	pub fn rotate(&mut self, radians: f32) {
-		self.m[0][0] = radians.cos(); self.m[1][0] = radians.sin();
-		self.m[0][1] = -radians.cos(); self.m[1][1] = radians.cos();
-	}
-
-	// Scales in place
-	pub fn scale(&mut self, v: Vec2) {
-		self.m[0][0] = v.x;
-		self.m[1][1] = v.y;
-	}
-
-	// Sheaers in place
-	pub fn shear(&mut self,  v: Vec2) {
-		self.m[0][1] = v.x;
-		self.m[1][0] = v.y;
-	}
-
+	/// Creates a translated 3x3 Matrix
 	pub fn translated(v: Vec2) -> Mat3{
 		let mut nmtx = Mat3::identity();
 		nmtx.m[2][0] = v.x;
@@ -57,6 +33,7 @@ impl Mat3 {
 		return nmtx;
 	}
 
+	/// Creates a rotated 3x3 Matrix
 	pub fn rotated(radians: f32) -> Mat3 {
 		let mut nmtx = Mat3::identity();
 		nmtx.m[0][0] = radians.cos(); nmtx.m[1][0] = radians.sin();
@@ -64,6 +41,7 @@ impl Mat3 {
 		return nmtx;
 	}
 
+	/// Creates a scaled 3x3 Matrix
 	pub fn scaled(v: Vec2) -> Mat3 {
 		let mut nmtx = Mat3::identity();
 		nmtx.m[0][0] = v.x;
@@ -71,6 +49,7 @@ impl Mat3 {
 		return nmtx;
 	}
 
+	/// Creates a sheared 3x3 Matrix
 	pub fn sheared(v: Vec2) -> Mat3 {
 		let mut nmtx = Mat3::identity();
 		nmtx.m[0][1] = v.x;
@@ -78,7 +57,7 @@ impl Mat3 {
 		return nmtx;
 	}
 
-	// Holy SHIT I wish I knew how this works. This is pretty black-box, sorry.
+	/// Creates an inverse of this Matrix, usually for getting correct pixel information when drawing 2D Images.
 	pub fn inv(&self) -> Mat3 {
 		let mut out = Mat3::identity();
 		let det: f32 = 
@@ -118,4 +97,3 @@ impl std::ops::Mul for Mat3 {
 		return Mat3 { m: fmtx };
 	}
 }
-// ==============================

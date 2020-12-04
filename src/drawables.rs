@@ -1,5 +1,6 @@
 use crate::all::*;
 
+/// Matrix-Transformed image drawing.
 pub struct Sprite<'a> {
     pub tint: Color,
     pub opacity: u8,
@@ -37,6 +38,7 @@ pub struct SpriteFontGlyph {
     pub image: Image,
 }
 
+/// Sprite-based font which offers more flexibility for drawing than the standard Font.
 pub struct SpriteFont {
     pub glyphs: Vec<SpriteFontGlyph>,
     pub glyphidx: Vec<char>,
@@ -114,7 +116,7 @@ impl SpriteFont {
                     rasterizer.opacity = 255;
                     
 
-                    jumpx += self.glyphs[j].image.width as f32 + self.spacing_horizontal;
+                    jumpx += self.spacing_horizontal;
                 }
             }
             rasterizer.set_draw_mode(DrawMode::Opaque);
