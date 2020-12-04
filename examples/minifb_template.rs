@@ -3,7 +3,6 @@ extern crate minifb;
 use aftershock::rasterizer::*;
 use aftershock::vectors::*;
 use aftershock::color::*;
-use aftershock::audio::*;
 use aftershock::drawables::*;
 use aftershock::assets::*;
 
@@ -16,7 +15,6 @@ const RENDER_HEIGHT: usize = 360;
 
 pub struct TemplateEngine {
     pub rasterizer: Rasterizer,
-    pub audio: Audio,
 
     pub realtime: f32,
     pub timescale: f32,
@@ -25,26 +23,18 @@ pub struct TemplateEngine {
     pub fps_print: u64,
     pub dt: f32,
     pub dt_unscaled: f32,
+
+    pub game_hz: u32,
+    game_hz_timer: f32,
+
     dt_before: Instant,
 
 }
 
 impl TemplateEngine {
     pub fn new() -> TemplateEngine {
-        println!("Mazic: Hiiii!");
-        println!("Mazic: This engine uses the following dependencies in much appreciation:");
-
-        println!("        sdl2");
-        println!("        bit_field");
-        println!("\nThank you all for all your hard work!\n");
-
-		println!("Mazic: Initializing...");
-
         TemplateEngine {
-
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
-
-            audio: Audio::new(8),
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -54,6 +44,9 @@ impl TemplateEngine {
             tics: 0,
             fps: 0,
             fps_print: 0,
+
+            game_hz: 9999, // Controls how often things are updated
+            game_hz_timer: 0.0,
 		}
 	}
 
@@ -77,55 +70,20 @@ impl TemplateEngine {
             }
         };
 
-		// Assets
+        // ==== Actual engine stuff ====
+		// Font for drawing FPS and such
 
-        self.audio.add("as_boot", "core/boot.wav");
-        self.audio.play_oneshot("as_boot");
-
-        let cursor: Image = Image::new("core/cursor.png");
-        let default: Image = Image::new("core/default.png");
-
-        let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTuVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
+        let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
         let sysfont: Font = Font::new("core/tiny_font.png", font_glyphidx, 5, 5, -1);
+
+        // Spritefont example. More flexible than the standard pprint but also more expensive.
+        let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 0.0, 8.0);
+        spritefont_test.position = Vec2::new(256.0, 128.0);
 
         let mut printtime: f32 = 0.0;
 
-        let mut sprite = Sprite::new(&default, 256.0, 128.0, 1.718, 4.0, 2.0, Color::white());
-
-
         while window.is_open() && !window.is_key_down(Key::Escape) {
-    
             self.update_times();
-
-            // == Rendering ==
-            self.rasterizer.cls_color(Color::new(128, 0, 0, 255));         
-
-
-            // Draw cool looking text
-            self.rasterizer.set_draw_mode(DrawMode::Alpha);
-            self.rasterizer.opacity = (self.realtime * 4.0).sin();
-            self.rasterizer.tint = aftershock::color::Color::cyan();
-            self.rasterizer.pprint(&sysfont, "CYYYAAAANNNNN!!!!!".to_string(), 256, 128);
-            self.rasterizer.tint = aftershock::color::Color::white();
-            self.rasterizer.set_draw_mode(DrawMode::Opaque);
-
-            // Draw rotating sprite
-            // Sprites have their own tints seperate from the Rasterizers
-            self.rasterizer.set_draw_mode(DrawMode::Alpha);
-            self.rasterizer.opacity = 0.25;
-			
-            sprite.rotation = self.realtime;
-			sprite.draw(&mut self.rasterizer);
-            self.rasterizer.set_draw_mode(DrawMode::Opaque);
-
-			let total_pixels = self.rasterizer.drawn_pixels_since_cls;
-            self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} FPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
-			
-			
-			// == Present ==
-            
-            self.tics += 1;
-            self.fps += 1;
 
             printtime += self.dt_unscaled;
             if printtime > 1.0 {
@@ -133,15 +91,38 @@ impl TemplateEngine {
                 self.fps = 0;
                 printtime = 0.0;
             }
-            
-            // We unwrap here as we want this code to exit if it fails
-            let colors_u32: Vec<u32> = self.rasterizer.framebuffer.color.chunks_exact(4)
-                .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
-                .collect();
 
-            window
-                .update_with_buffer(colors_u32.as_slice(), RENDER_WIDTH, RENDER_HEIGHT)
-                .unwrap();
+            // Only update the game at a certain rate
+            self.game_hz_timer -= self.dt_unscaled;
+            if self.game_hz_timer <= 0.0 {
+                self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+
+                // High level spritefont example
+                spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
+                spritefont_test.scale = Vec2::one() * self.realtime.cos();
+                spritefont_test.text = "WEEEEEEE WOOOOW WEEEEEEE\nDAAAAMMNNNNNNNSONNNNN\nWOOAAHHHHHHHH!!!!!!!!11!!1!!!".to_string();
+                spritefont_test.draw(&mut self.rasterizer);
+
+                let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+                self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
+                
+                // combine the colors into u32 instead of 4's of u8
+                let colors_u32: Vec<u32> = self.rasterizer.framebuffer.color.chunks_exact(4)
+                    .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
+                    .collect();
+
+                // Present
+                window
+                    .update_with_buffer(colors_u32.as_slice(), RENDER_WIDTH, RENDER_HEIGHT)
+                    .unwrap();
+                
+                // Book keeping
+                self.tics += 1;
+                self.fps += 1;
+
+                // Set the new update delay
+                self.game_hz_timer = 1.0 / self.game_hz as f32;
+            }
 
             std::thread::sleep(std::time::Duration::from_micros(1));
         }
@@ -167,8 +148,8 @@ impl TemplateEngine {
 
 pub fn main() {
     
-    let mut ase = TemplateEngine::new();
+    let mut engine = TemplateEngine::new();
 
     // Hardware accelerated windows will update faster than native window compositors, but both perform similarly
-    let _error_code = ase.run();
+    let _error_code = engine.run();
 }

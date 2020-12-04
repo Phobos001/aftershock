@@ -18,20 +18,6 @@ pub fn lerpi(a: i32, b: i32, t: f32) -> i32 {
 	((a + (b - a)) as f32 * t).floor() as i32
 }
 
-pub fn lerpu8(a: u8, b: u8, t: f32) -> u8 {
-	((a + (b - a)) as f32 * t).round() as u8
-}
-
-pub fn lerp_color(c1: [u8; 4], c2: [u8; 4], t: f32) -> [u8; 4] {
-
-	[
-		lerpu8(c1[0], c2[0], t),
-		lerpu8(c1[1], c2[1], t),
-		lerpu8(c1[2], c2[2], t),
-		lerpu8(c1[3] ,c2[3], t)
-	]
-}
-
 pub fn dist2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32{
 	((x1 - x0).powf(2.0) + (y1 - y0).powf(2.0)).sqrt()
 }

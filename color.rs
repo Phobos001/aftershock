@@ -1,5 +1,3 @@
-
-use crate::math::*;
 #[derive(Debug, Copy, Clone)]
 pub struct Color {
 	pub r: u8,
@@ -9,6 +7,8 @@ pub struct Color {
 }
 
 impl Color {
+
+	/// InVeNt NeW cOlOrS
 	pub fn new(r: u8, g: u8, b: u8, a: u8) -> Color {
 		Color {
 			r, g, b, a
@@ -43,10 +43,10 @@ impl Color {
 	}
 
 	/// Faster but lest accurate alpha-blending function. https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
-	pub fn blend_fast(src: Color, dst: Color, opacity: f32) -> Color {
+	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
 		if src.a <= 0 { return Color::clear(); }
 
-		let alpha: u32 = lerpu8(0, src.a, opacity) as u32;
+		let alpha: u32 = (src.a - (255 - opacity)) as u32;
 
 		let sr: u32 = src.r as u32;
 		let sg: u32 = src.g as u32;
@@ -64,6 +64,7 @@ impl Color {
 
 	}
 
+	/// Byte inverted copy of the color
 	pub fn inverted(&self) -> Color {
 		Color {
 			r: 255 - self.r,
@@ -73,10 +74,30 @@ impl Color {
 		}
 	}
 
+	/// Hue, Saturation, and Value color definition. Should not be used per pixel due to casting and division use.
+	pub fn hsv(hue: f32, saturation: f32, value: f32) -> Color {
+		let hi: i32 = ((hue / 60.0).floor() as i32) % 6;
+		let f: f32 = (hue / 60.0) - (hue / 60.0).floor();
+
+		let p: f32 = value * (1.0 - saturation);
+		let q: f32 = value * (1.0 - (f * saturation));
+		let t: f32 = value * (1.0 - ((1.0 - f) * saturation));
+
+		match hi
+		{
+			0 => { return Color::new((value * 255.0) as u8, (t * 255.0) as u8, (p * 255.0) as u8, 255); },
+			1 => { return Color::new((q * 255.0) as u8, (value * 255.0) as u8, (p * 255.0) as u8, 255); },
+			2 => { return Color::new((p * 255.0) as u8, (value * 255.0) as u8, (t * 255.0) as u8, 255); },
+			3 => { return Color::new((p * 255.0) as u8, (q * 255.0) as u8, (value * 255.0) as u8, 255); },
+			4 => { return Color::new((t * 255.0) as u8, (p * 255.0) as u8, (value * 255.0) as u8, 255); },
+			5 => { return Color::new((value * 255.0) as u8, (p * 255.0) as u8, (q * 255.0) as u8, 255); },
+			_ => { return Color::white(); }
+		}
+	}
+
 	pub fn clear() -> Color {
 		Color { r: 0, g: 0, b: 0, a: 0 }
 	}
-
 
 	pub fn black() -> Color {
 		Color { r: 0, g: 0, b: 0, a: 255 }
@@ -199,13 +220,21 @@ impl std::ops::SubAssign for Color {
 
 impl std::ops::MulAssign for Color {
 	fn mul_assign(&mut self, rhs: Self) {
-        *self = Color::new(
-			self.r * rhs.r,
-			self.g * rhs.g,
-			self.b * rhs.b,
-			self.a * rhs.a,
-		);
-    }
+		let sr32 = self.r as u32;
+		let sg32 = self.g as u32;
+		let sb32 = self.b as u32;
+
+		let rhsr32 = rhs.r as u32;
+		let rhsg32 = rhs.g as u32;
+		let rhsb32 = rhs.b as u32;
+		
+		*self = Color::new(
+			(((sr32 * rhsr32 + 255)) >> 8) as u8,
+			(((sg32 * rhsg32 + 255)) >> 8) as u8,
+			(((sb32 * rhsb32 + 255)) >> 8) as u8,
+			self.a,
+		)
+	}
 }
 
 impl std::ops::DivAssign for Color {
@@ -218,49 +247,3 @@ impl std::ops::DivAssign for Color {
 		);
     }
 }
-
-
-/* #[derive(Debug, Copy, Clone)]
-pub struct Color {
-	r: f32,
-	g: f32,
-	b: f32,
-	a: f32,
-}
-
-impl Color {
-	pub fn new(r: f32, g: f32, b: f32, a: f32) -> Color {
-		Color {
-			r: clampf(r, 0.0, 1.0),
-			g: clampf(g, 0.0, 1.0),
-			b: clampf(b, 0.0, 1.0),
-			a: clampf(a, 0.0, 1.0),
-		}
-	}
-
-	pub fn new_from_bit8(color: [u8; 4]) -> Color {
-		Color {
-			r: color[0] as f32 / 255.0,
-			g: color[1] as f32 / 255.0,
-			b: color[2] as f32 / 255.0,
-			a: color[3] as f32 / 255.0,
-		}
-	}
-
-	pub fn alpha_composite_gamma(c1: Color, c2: Color, gamma: f32) -> Color {
-		let r = (c1.r.powf(gamma) * c1.a + c2.r.powf(gamma) * (1.0 - c2.a)).powf(1.0 / gamma);
-		let g = (c1.g.powf(gamma) * c1.a + c2.g.powf(gamma) * (1.0 - c2.a)).powf(1.0 / gamma);
-		let b = (c1.b.powf(gamma) * c1.a + c2.b.powf(gamma) * (1.0 - c2.a)).powf(1.0 / gamma);
-		let a = (c1.a.powf(gamma) * c1.a + c2.a.powf(gamma) * (1.0 - c2.a)).powf(1.0 / gamma);
-		Color::new(r, g, b, a)
-	}
-
-	pub fn bit8(&self) -> [u8; 4] {
-		[
-			(self.r * 255.0).round() as u8,
-			(self.g * 255.0).round() as u8,
-			(self.b * 255.0).round() as u8,
-			(self.a * 255.0).round() as u8,
-		]
-	}
-} */

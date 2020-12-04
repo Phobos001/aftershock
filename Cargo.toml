@@ -13,7 +13,6 @@ crate-type = ["lib"]
 [dependencies]
 lodepng = "3.2.2" # load pngs for Image to Vec<u8>
 rgb = "0.8.25" # helps the above
-rodio = "0.13.0" # audio management, can be ignored if the user wants to use a different audio library
 
 [dev-dependencies]
 sdl2 = "0.34.3"

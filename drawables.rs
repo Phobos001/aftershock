@@ -2,7 +2,7 @@ use crate::all::*;
 
 pub struct Sprite<'a> {
     pub tint: Color,
-    pub opacity: f32,
+    pub opacity: u8,
 	pub offset: Vec2,
 	pub image: &'a Image,
 	pub position: Vec2,
@@ -15,7 +15,7 @@ impl<'a> Sprite<'a> {
 		Sprite {
             image,
             tint,
-            opacity: 1.0,
+            opacity: 255,
 			offset: Vec2::new(-(image.width as f32) / 2.0, -(image.height as f32) / 2.0),
 			position: Vec2::new(x, y),
 			rotation: a,
@@ -26,8 +26,8 @@ impl<'a> Sprite<'a> {
 	pub fn draw(&self, rasterizer: &mut Rasterizer) {
         rasterizer.tint = self.tint;
         rasterizer.opacity = self.opacity;
-        rasterizer.pimgmtx(self.image, self.position, self.rotation, self.scale, self.offset, true);
-        rasterizer.opacity = 1.0;
+        rasterizer.pimgmtx(self.image, self.position, self.rotation, self.scale, self.offset);
+        rasterizer.opacity = 255;
         rasterizer.tint = Color::white();
 	}
 }
@@ -45,7 +45,7 @@ pub struct SpriteFont {
     pub spacing_vertical: f32,
 
     pub tint: Color,
-    pub opacity: f32,
+    pub opacity: u8,
 
     pub position: Vec2,
     pub scale: Vec2,
@@ -82,7 +82,7 @@ impl SpriteFont {
             spacing_vertical: glyph_spacing_vertical,
 
             tint: Color::white(),
-            opacity: 1.0,
+            opacity: 255,
 
             position: Vec2::zero(),
             scale: Vec2::one(),
@@ -99,47 +99,25 @@ impl SpriteFont {
         for i in 0..chars.len() {
             if chars[i] == '\n' { jumpy += self.spacing_vertical; jumpx = 0.0; continue; }
             if chars[i] == ' ' { jumpx += self.spacing_horizontal; continue; }
+            rasterizer.set_draw_mode(DrawMode::Alpha);
             for j in 0..self.glyphs.len() {
                 if self.glyphs[j].glyph == chars[i] {
-                    rasterizer.set_draw_mode(DrawMode::Alpha);
+                    
                     rasterizer.tint = self.tint;
                     rasterizer.opacity = self.opacity;
-                    rasterizer.pimgmtx(&self.glyphs[j].image, 
-                self.position + Vec2::new(jumpx, jumpy),
+                    rasterizer.pimgmtx(&self.glyphs[j].image, self.position + Vec2::new(jumpx, jumpy),
                         self.rotation,
                         self.scale,
-                        self.offset,
-            true);
-                    rasterizer.set_draw_mode(DrawMode::Alpha);
+                        self.offset);
+                    
                     rasterizer.tint = Color::white();
-                    rasterizer.opacity = 1.0;
+                    rasterizer.opacity = 255;
                     
 
                     jumpx += self.glyphs[j].image.width as f32 + self.spacing_horizontal;
                 }
             }
+            rasterizer.set_draw_mode(DrawMode::Opaque);
         }
     }
-}
-
-pub struct Line {
-	p1: Vec2,
-	p2: Vec2,
-	color: Color,
-}
-
-impl Line {
-	pub fn new() -> Line {
-		Line {
-			p1: Vec2::zero(),
-			p2: Vec2::one(),
-			color: Color::new(255, 255, 255, 255),
-		}
-	}
-
-	pub fn draw(&self, rasterizer: &mut Rasterizer) {
-		let p1 = rasterizer.mtx.forward(self.p1);
-		let p2 = rasterizer.mtx.forward(self.p2);
-		rasterizer.pline(p1.x as i32, p1.y as i32, p2.x as i32, p2.y as i32, self.color);
-	}
 }

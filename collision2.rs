@@ -1,5 +1,7 @@
 use crate::all::*;
 
+use std::rc::Rc;
+
 pub struct Resolution {
 	pub time: f32,
 	pub point: Vec2,
@@ -18,6 +20,11 @@ impl Resolution {
 			normal_push,
 		}
 	}
+}
+
+pub struct Line {
+	pub p1: Vec2,
+	pub p2: Vec2,
 }
 
 // This shit is tight yo: https://noonat.github.io/intersect/
@@ -67,13 +74,13 @@ impl AABB {
 		}
 	}
 
-	pub fn overlap_line(aabb: &AABB, p1: Vec2, p2: Vec2, padding: Vec2) -> bool {
-		let scale = Vec2::new(1.0 / p2.x, 1.0 / p2.y);
+	pub fn overlap_line(aabb: &AABB, line: Line, padding: Vec2) -> bool {
+		let scale = Vec2::new(1.0 / line.p2.x, 1.0 / line.p2.y);
 		let sign = Vec2::new(signf(scale.x), signf(scale.y));
 
 		// 'Time' here is just a name for a lerp scale t; How far along the line basically.
-		let near_time = (aabb.position - sign * (aabb.extents + padding) - p1) * scale;
-		let far_time = (aabb.position + sign * (aabb.extents + padding) - p1) * scale;
+		let near_time = (aabb.position - sign * (aabb.extents + padding) - line.p1) * scale;
+		let far_time = (aabb.position + sign * (aabb.extents + padding) - line.p1) * scale;
 
 		// No intersection can be happening since it's out of bounds of the AABB
 		if near_time.x > far_time.y || near_time.y > far_time.x {
@@ -92,13 +99,13 @@ impl AABB {
 		return true;
 	}
 
-	pub fn resolution_line(aabb: &AABB, p1: Vec2, p2: Vec2, padding: Vec2) -> Option<Resolution> {
-		let scale = Vec2::new(1.0 / p2.x, 1.0 / p2.y);
+	pub fn resolution_line(aabb: &AABB, line: Line, padding: Vec2) -> Option<Resolution> {
+		let scale = Vec2::new(1.0 / line.p2.x, 1.0 / line.p2.y);
 		let sign = Vec2::new(signf(scale.x), signf(scale.y));
 
 		// 'Time' here is just a name for a lerp scale t; How far along the line basically.
-		let near_time = (aabb.position - sign * (aabb.extents + padding) - p1) * scale;
-		let far_time = (aabb.position + sign * (aabb.extents + padding) - p1) * scale;
+		let near_time = (aabb.position - sign * (aabb.extents + padding) - line.p1) * scale;
+		let far_time = (aabb.position + sign * (aabb.extents + padding) - line.p1) * scale;
 
 		// No intersection can be happening since it's out of bounds of the AABB
 		if near_time.x > far_time.y || near_time.y > far_time.x {
@@ -124,8 +131,8 @@ impl AABB {
 			}
 		};
 
-		let delta: Vec2 = p2 * (1.0 / time);
-		let point: Vec2 = Vec2::lerp(p1, p2, time);
+		let delta: Vec2 = line.p2 * (1.0 / time);
+		let point: Vec2 = Vec2::lerp(line.p1, line.p2, time);
 
 		Some(Resolution {
 			point,
@@ -171,6 +178,46 @@ impl AABB {
 			None
 		}
 	}
+}
 
-	// TODO: Add a raycast resolution method for moving AABBs (Cast AABB and set position to hit point before resolving AABB)
+pub struct Circle {
+	pub position: Vec2,
+	pub radius: f32,
+}
+
+impl Circle {
+
+}
+
+pub enum BlockmapColliderType {
+	AABB,
+	Line,
+	Circle,
+}
+
+pub struct BlockmapColliderEntry {
+	pub id: u32,
+	pub collider_type: BlockmapColliderType,
+}
+
+pub struct BlockmapCell {
+	pub aabbs: Vec<usize>,
+	pub lines: Vec<usize>,
+	pub circles: Vec<usize>,
+}
+
+impl BlockmapCell {
+	pub fn new() -> BlockmapCell {
+
+	}
+}
+
+/// Spatial partioning for broad-phase decection.
+pub struct Blockmap {
+	pub uid_count: u32,
+	pub colliders: Vec<BlockmapColliderEntry>,
+}
+
+impl Blockmap {
+
 }

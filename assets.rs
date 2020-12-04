@@ -1,7 +1,7 @@
 extern crate lodepng;
 extern crate rgb;
 
-use crate::all::*;
+use crate::color::*;
 
 use rgb::*;
 

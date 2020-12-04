@@ -2,6 +2,7 @@ use crate::all::*;
 
 pub type PSetOp = fn(&mut Rasterizer, usize, Color);
 
+/// Heap-Allocated Framebuffer.
 #[derive(Debug, Clone)]
 pub struct FrameBuffer {
     pub width: usize,
@@ -10,6 +11,7 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
+    /// Createds a new framebuffer. Normally created inside a Rasterizer during its initialization
     pub fn new(width: usize, height: usize) -> FrameBuffer {
         FrameBuffer {
             width,
@@ -33,7 +35,9 @@ impl FrameBuffer {
         }
     }
 
-    pub fn blit(&mut self, fbuf_blit: &FrameBuffer, offset_x: usize, offset_y: usize) {
+    // Depreciated, originally going to be used for a poly-rasterizer but that didn't pan out.
+    /*
+    pub fn blit_framebuffer(&mut self, fbuf_blit: &FrameBuffer, offset_x: usize, offset_y: usize) {
         let stride = 4;
         // We blit these directly into the color buffer because otherwise we'd just be drawing everything over again and we don't have to worry about depth
         
@@ -87,9 +91,10 @@ impl FrameBuffer {
                 }
             }
         });
-    }
+    }*/
 }
 
+/// Controls how a rasterizer should draw incoming pixels.
 #[derive(Debug, Clone, Copy)]
 pub enum DrawMode {
     Opaque,
@@ -102,6 +107,7 @@ pub enum DrawMode {
     InvertedOpaque,
 }
 
+/// Draw pixels if they are fully opaque, otherwise ignore them.
 fn pset_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a < 255 { return; }
     let color = color * rasterizer.tint;
@@ -112,8 +118,9 @@ fn pset_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Draw pixels and blend them with the background based on the alpha channel
 fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
-    if color.a <= 0 { return; }
+    
     let fg = color * rasterizer.tint;
     let bg = Color::new(
         rasterizer.framebuffer.color[idx + 0],
@@ -131,6 +138,7 @@ fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Add incoming and buffer pixels together and draw to screen
 fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
     let fg = color * rasterizer.tint;
@@ -150,6 +158,7 @@ fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Multiply incoming pixel with buffer pixel.
 fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
     let fg = color* rasterizer.tint;
@@ -169,6 +178,7 @@ fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Draw inverted copy of incoming pixel with alpha blending
 fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
     let fg = color* rasterizer.tint;
@@ -188,6 +198,7 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Draw inverted copy of incoming pixel as opaque
 fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a < 255 { return; }
     let c = (color * rasterizer.tint).inverted();
@@ -199,42 +210,23 @@ fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
-#[derive(Clone)]
+/// Drawing switchboard that draws directly into a framebuffer. Contains a variety of drawing functions as methods, but custom drawing functions
+/// can be created if one desires.
 pub struct Rasterizer {
     pset_op: PSetOp,
     pub framebuffer: FrameBuffer,
+
     pub draw_mode: DrawMode,
     pub tint: Color,
-    pub mtx: Mat3,
-    pub opacity: f32,
-    pub rotation: f32,
-    pub camera_x: f32,
-    pub camera_y: f32,
-    pub scale_x: f32,
-    pub scale_y: f32,
-    pub camera_enabled: bool,
+    pub opacity: u8,
+
+    pub collected_pixels: Vec<(i32, i32)>,
+    pub camera_x: i32,
+    pub camera_y: i32,
     pub drawn_pixels_since_cls: u64,
     pub time_since_cls: std::time::Duration,
 }
 
-
-
-
-/// Fullscreen drawing surface with immediate-mode drawing. More than one Rasterizer can be made and combined together
-/// later for more advanced graphical applications.
-///
-/// # Examples
-///
-/// ```
-/// use aftershock::rasterizer::Rasterizer;
-/// 
-/// let rasterizer = aftershock::Rasterizer::new(384, 216);
-/// let color: [u8; 4] = [0, 255, 255, 255]
-/// rasterizer.pset(128, 128, color);
-/// let drawn_color: [u8; 4] = rasterizer.pget(128, 128);
-///
-/// assert_eq!(color, drawn_color);
-/// ```
 impl Rasterizer {
 
     /// Makes a new Rasterizer to draw to a screen-sized buffer
@@ -250,22 +242,19 @@ impl Rasterizer {
         Rasterizer {
             pset_op: pset_opaque,
             framebuffer: FrameBuffer::new(width, height),
-            draw_mode: DrawMode::Alpha,
+            draw_mode: DrawMode::Opaque,
             tint: Color::white(),
-            mtx: Mat3::identity(),
-            opacity: 1.0,
-            camera_x: 0.0,
-            camera_y: 0.0,
-            camera_enabled: true,
-            rotation: 0.0,
-            scale_x: 1.0,
-            scale_y: 1.0,
+            opacity: 255,
+            camera_x: 0,
+            camera_y: 0,
             drawn_pixels_since_cls: 0,
             time_since_cls: std::time::Duration::new(0, 0),
+
+            collected_pixels: Vec::new(),
         }
     }
 
-    // We don't use this match directly inside pset because it helps reduce branching in hot code
+    /// Sets the rasterizers drawing mode for incoming pixels. Should be defined before every drawing operation.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
             DrawMode::Opaque => {self.pset_op = pset_opaque;},
@@ -278,25 +267,13 @@ impl Rasterizer {
         }
     }
 
-    pub fn set_custom_draw_mode(&mut self, op: fn(&mut Rasterizer, usize, Color)) {
-        self.pset_op = op;
-    }
-
-    pub fn update_mtx(&mut self) {
-        let rmtx_r = Mat3::rotated(self.rotation);
-        let rmtx_o = Mat3::translated(Vec2::new(-(self.framebuffer.width as f32) / 2.0, -(self.framebuffer.height as f32) / 2.0));
-        let rmtx_no = Mat3::translated(Vec2::new((self.framebuffer.width as f32) / 2.0, (self.framebuffer.height as f32) / 2.0));
-        let rmtx_s = Mat3::scaled(Vec2::new(self.scale_x, self.scale_y));
-        let rmtx_p = Mat3::translated(Vec2::new(self.camera_x, self.camera_y));
-        // Offset -> Scaling -> Rotation -> Position -> Reverse Offset
-        self.mtx = rmtx_no * rmtx_p * rmtx_r * rmtx_s * rmtx_o;
-    }
-
+    /// Clears the frame memory directly, leaving a black screen.
     pub fn cls(&mut self) {
         self.framebuffer.color = vec![0; self.framebuffer.width * self.framebuffer.height * 4];
         self.drawn_pixels_since_cls = 0;
     }
 
+    /// Clears the screen to a color.
     pub fn cls_color(&mut self, color: Color) {
         self.framebuffer.color.chunks_exact_mut(4).for_each(|c| {
             c[0] = color.r;
@@ -309,24 +286,13 @@ impl Rasterizer {
 
     
 
-    /// Draws a pixel to the color buffer.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use aftershock::rasterizer::Rasterizer;
-    /// 
-    /// let mut rasterizer = Rasterizer::new(256, 256, true);
-    /// let color: [u8; 4] = [255, 128, 64, 255];
-    /// rasterizer.pset(128, 128, color);
-    /// assert_eq!(rasterizer.pget(128, 128)[1], color[1]);
-    /// ```
+    /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
-        /* let x = if self.camera_enabled { -self.camera_x as i32 + x } else { x };
-        let y = if self.camera_enabled { -self.camera_y as i32 + y } else { y }; */
-        
+        let x = -self.camera_x as i32 + x;
+        let y = -self.camera_y as i32 + y;
+
         let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
-        
+    
         let out_left: bool = x < 0;
         let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
         let out_top: bool = y < 0;
@@ -339,16 +305,7 @@ impl Rasterizer {
         (self.pset_op)(self, idx, color);
     }
 
-    /// Gets a color from the color buffer, defined in [u8; 4]
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let rasterizer = aftershock::Rasterizer::new(800, 600);
-    /// let color = [255, 128, 64, 255];
-    /// rasterizer.pset(128, 128, color);
-    /// assert_eq!(rasterizer.pget(128, 128), color);
-    /// ```
+    /// Gets a color from the color buffer.
     pub fn pget(&mut self, x: i32, y: i32) -> Color {
         let idx: usize = (y * (self.framebuffer.width as i32) + x) as usize;
 
@@ -368,8 +325,7 @@ impl Rasterizer {
         );
     }
     
-    // Thanks michael and bresenham!
-    // https://stackoverflow.com/questions/34440429/draw-a-line-in-a-bitmap-possibly-with-piston
+    /// Draws a line using the Bresenham algorithm across two points
     pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
 
         // Create local variables for moving start point
@@ -404,8 +360,8 @@ impl Rasterizer {
         }
     }
 
-    // Returns array of pixels from line
-    pub fn pline_collect(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    /// Returns pixel positions across the line instead of drawing them.
+    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
 
         let mut pixels: Vec<(i32, i32)> = Vec::new();
 
@@ -444,31 +400,26 @@ impl Rasterizer {
     }
     
     
-    
-    pub fn prectfill(&mut self,x: i32, y: i32, w: i32, h: i32, color: Color) {
+    /// Draws a rectangle onto the screen. Can either be filled or outlined.
+    pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
         let x0 = x;
         let x1 = x + w;
         let y0 = y;
         let y1 = y + h;
     
-        for i in y0..y1 {
-            self.pline(x0, i, x1, i, color);
+        if filled {
+            for i in y0..y1 {
+                self.pline(x0, i, x1, i, color);
+            }
+        } else {
+            self.pline(x0, y0, x1, y0, color);
+            self.pline(x0, y0, x0, y1, color);
+            self.pline(x0, y1, x1, y1, color);
+            self.pline(x1, y0, x1, y1, color);
         }
     }
     
-    pub fn prectline(&mut self, x: i32, y: i32, w: i32, h: i32, color: Color) {
-        let x0 = x;
-        let x1 = x + w;
-        let y0 = y;
-        let y1 = y + h;
-    
-        self.pline(x0, y0, x1, y0, color);
-        self.pline(x0, y0, x0, y1, color);
-        self.pline(x0, y1, x1, y1, color);
-        self.pline(x1, y0, x1, y1, color);
-    
-    }
-    
+    /// Draws a circle onto the screen. Can either be filled or outlined.
     pub fn pcircle(&mut self, filled: bool, xc: i32, yc: i32, r: i32, color: Color) { 
         let mut x: i32 = 0;
         let mut y: i32 = r; 
@@ -518,6 +469,7 @@ impl Rasterizer {
         }
     }
 
+    /// Draws an image directly to the screen.
     pub fn pimg(&mut self, image: &Image, x: i32, y: i32) {
         for ly in 0..image.height {
             for lx in 0..image.width {
@@ -528,6 +480,7 @@ impl Rasterizer {
         }
     }
 
+    /// Draws a section of an image directly to the screen.
     pub fn pimgrect(&mut self, image: &Image, x: i32, y: i32, rx: usize, ry: usize, rw: usize, rh: usize) {
         let range_x = rx + rw;
         let range_y = ry + rh;
@@ -544,17 +497,14 @@ impl Rasterizer {
         }
     }
 
-    pub fn pimgmtx(&mut self, image: &Image, position: Vec2, rotation: f32, scale: Vec2, offset: Vec2, camera_space: bool) {
+    /// Draws a rotated and scaled image to the screen using matrix multiplication.
+    pub fn pimgmtx(&mut self, image: &Image, position: Vec2, rotation: f32, scale: Vec2, offset: Vec2) {
         let mtx_o = Mat3::translated(offset);
         let mtx_r = Mat3::rotated(rotation);
         let mtx_p = Mat3::translated(position);
         let mtx_s = Mat3::scaled(scale);
 
-        let cmtx = if camera_space {
-            self.mtx * (mtx_p * mtx_r * mtx_s * mtx_o)
-        } else {
-            mtx_p * mtx_r * mtx_s * mtx_o
-        };
+        let cmtx = mtx_p * mtx_r * mtx_s * mtx_o;
 
         // We have to get the rotated bounding box of the rotated sprite in order to draw it correctly without blank pixels
         let start_center: Vec2 = cmtx.forward(Vec2::zero());
@@ -603,11 +553,13 @@ impl Rasterizer {
                 // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
                 let ip: Vec2 = cmtx_inv.forward(Vec2::new(lx as f32, ly as f32));
                 let color: Color = image.pget(ip.x as i32, ip.y as i32);
+                if color.a <= 0 { continue; }
                 self.pset(lx as i32, ly as i32, color);
             }
         }
     }
 
+    /// Draws text directly to the screen using a provided font.
     pub fn pprint(&mut self, font: &Font, text: String, x: i32, y: i32) {
         let mut jumpx: isize = 0;
         let mut jumpy: isize = 0;
@@ -632,108 +584,116 @@ impl Rasterizer {
         }
     }
 
-    pub fn ptriline(&mut self,v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
-        self.pline(v1x, v1y, v2x, v2y, color);
-        self.pline(v1x, v1y, v3x, v3y, color);
-        self.pline(v2x, v2y, v3x, v3y, color);
+    /// Draws a triangle directly to the screen.
+    pub fn ptriangle(&mut self, filled: bool, v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
+        if filled {
+            // Collect pixels from lines without drawing to the screen
+            let vl12 = self.cline(v1x, v1y, v2x, v2y);
+            let vl13 = self.cline(v1x, v1y, v3x, v3y);
+            let vl23 = self.cline(v2x, v2y, v3x, v3y);
+
+            let mut all_pixels: Vec<(i32, i32)> = Vec::new();
+            for p1 in vl12 {
+                all_pixels.push(p1);
+            }
+            for p2 in vl13 {
+                all_pixels.push(p2)
+            }
+            for p3 in vl23 {
+                all_pixels.push(p3);
+            }
+
+            // Sort by row
+            all_pixels.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
+
+            for p in all_pixels {
+                if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1 {
+                    scanline_rows[p.1 as usize].push(p);
+                }
+            }
+
+            for row in scanline_rows {
+                if row.len() == 0 { continue; }
+                let height = row[0].1;
+                self.pline(row[0].0, height, row[row.len()-1].0, height, color);
+            }
+        } else {
+            self.pline(v1x, v1y, v2x, v2y, color);
+            self.pline(v1x, v1y, v3x, v3y, color);
+            self.pline(v2x, v2y, v3x, v3y, color);
+        }
     }
-    
-    pub fn ptrifill(&mut self, v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
-        // Collect pixels from lines without drawing to the screen
-        let vl12 = self.pline_collect(v1x, v1y, v2x, v2y);
-        let vl13 = self.pline_collect(v1x, v1y, v3x, v3y);
-        let vl23 = self.pline_collect(v2x, v2y, v3x, v3y);
 
-        let mut all_pixels: Vec<(i32, i32)> = Vec::new();
-        for p1 in vl12 {
-            all_pixels.push(p1);
-        }
-        for p2 in vl13 {
-            all_pixels.push(p2)
-        }
-        for p3 in vl23 {
-            all_pixels.push(p3);
-        }
+    /// Draws a quadratic beizer curve onto the screen.
+    pub fn pbeizer(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
+        let mut step: f32 = 0.0;
 
-        // Sort by row
-        all_pixels.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        // Get the maximal number of pixels we will need to use and get its inverse as a step size.
+        // Otherwise we don't know how many pixels we will need to draw
+        let stride_c1 = self.cline(x0, y0, mx, my).len() as f32;
+        let stride_c2 = self.cline(mx, my, x1, y1).len() as f32;
 
-        let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
+        let stride: f32 = (1.0 / (stride_c1 + stride_c2)) * 0.5;
 
-        for p in all_pixels {
-            if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1 {
-                scanline_rows[p.1 as usize].push(p);
-            }
+        let x0 = x0 as f32;
+        let y0 = x0 as f32;
+        let x1 = x1 as f32;
+        let y1 = y1 as f32;
+        let mx = mx as f32;
+        let my = my as f32;
+
+        loop {
+            if step > 1.0 { break; }
+
+            let px0 = lerpf(x0, mx, step);
+            let py0 = lerpf(y0, my, step);
+
+            let px1 = lerpf(px0, x1, step);
+            let py1 = lerpf(py0, y1, step);
+
+            self.pset(px1 as i32, py1 as i32, color);
+            step += stride;
         }
-
-        for row in scanline_rows {
-            if row.len() == 0 { continue; }
-            let height = row[0].1;
-            self.pline(row[0].0, height, row[row.len()-1].0, height, color);
-        }
-        
     }
 
-    // Looks like shit but kinda works. Gonna bring back the OLC code form before
-    pub fn ptritex2(&mut self, texture: &Image, v1x: i32, v1y: i32, v1u: f32, v1v: f32,
-         v2x: i32, v2y: i32, v2u: f32, v2v: f32,
-          v3x: i32, v3y: i32, v3u: f32, v3v: f32) {
-        // Collect pixels from lines without drawing to the screen
-        let vl12 = self.pline_collect(v1x, v1y, v2x, v2y);
-        let vl13 = self.pline_collect(v1x, v1y, v3x, v3y);
-        let vl23 = self.pline_collect(v2x, v2y, v3x, v3y);
+    /// Draws a cubic beizer curve onto the screen.
+    pub fn pbeizer_cubic(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx0: i32, my0: i32, mx1: i32, my1: i32, color: Color) {
+        let mut step: f32 = 0.0;
 
-        let mut all_pixels: Vec<(i32, i32, f32, f32)> = Vec::new();
+        // Get the maximal number of pixels we will need to use and get its inverse as a step size.
+        // Otherwise we don't know how many pixels we will need to draw
+        let stride_c1: f32 = self.cline(x0, y0, mx0, my0).len() as f32;
+        let stride_c2: f32 = self.cline(mx0, my0, mx1, my1).len() as f32;
+        let stride_c3: f32 = self.cline(mx1, my1, x1, y1).len() as f32;
 
-        let vl12_len = vl12.len();
-        let vl13_len = vl13.len();
-        let vl23_len = vl23.len();
+        let stride = (1.0 / (stride_c1 + stride_c2 + stride_c3)) * 0.5;
 
-        for i in 0..vl12_len {
-            all_pixels.push((vl12[i].0, vl12[i].1, lerpf(v1u, v2u, i as f32 / vl12_len as f32), lerpf(v1v, v2v, i as f32 / vl12_len as f32)));
+        let x0 = x0 as f32;
+        let y0 = x0 as f32;
+        let x1 = x1 as f32;
+        let y1 = y1 as f32;
+        let mx0 = mx0 as f32;
+        let my0 = my0 as f32;
+        let mx1 = mx1 as f32;
+        let my1 = my1 as f32;
+
+        loop {
+            if step > 1.0 { break; }
+
+            let px0 = lerpf(x0, mx0, step);
+            let py0 = lerpf(y0, my0, step);
+
+            let px1 = lerpf(px0, mx1, step);
+            let py1 = lerpf(py0, my1, step);
+
+            let px2 = lerpf(px1, x1, step);
+            let py2 = lerpf(py1, y1, step);
+
+            self.pset(px2 as i32, py2 as i32, color);
+            step += stride;
         }
-        for i in 0..vl13_len {
-            all_pixels.push((vl13[i].0, vl13[i].1, lerpf(v1u, v3u, i as f32 / vl13_len as f32), lerpf(v1v, v3v, i as f32 / vl13_len as f32)));
-        }
-        for i in 0..vl23_len {
-            all_pixels.push((vl23[i].0, vl23[i].1, lerpf(v3u, v3u, i as f32 / vl23_len as f32), lerpf(v2v, v3v, i as f32 / vl23_len as f32)));
-        }
-
-        // Sort by row
-        all_pixels.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-        let mut scanline_rows: Vec<Vec<(i32, i32, f32, f32)>> = vec![Vec::new(); self.framebuffer.height];
-
-        for p in all_pixels {
-            if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1 {
-                scanline_rows[p.1 as usize].push(p);
-            }
-        }
-
-        for row in scanline_rows {
-            if row.len() == 0 { continue; }
-            let height = row[0].1;
-
-            let rowlast = row.len()-1;
-
-            let utex0 = row[0].2 * texture.width as f32;
-            let vtex0 = row[0].3 * texture.height as f32;
-
-            let utex1 = row[rowlast].2 * texture.width as f32;
-            let vtex1 = row[rowlast].3 * texture.height as f32;
-            
-            
-            let rx1 = row[rowlast].0;
-            for rx0 in row[0].0..rx1 {
-
-                let step = rx0 as f32 / rx1 as f32;
-                let px = lerpf(utex0, utex1, step) as i32;
-                let py = lerpf(vtex0, vtex1, step) as i32;
-                let color = texture.pget(px, py);
-                self.pset(rx0, height, color);
-            }
-        }
-        
     }
     
 }
