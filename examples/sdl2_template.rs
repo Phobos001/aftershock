@@ -38,15 +38,6 @@ pub struct TemplateEngine {
 
 impl TemplateEngine {
     pub fn new() -> TemplateEngine {
-        println!("Mazic: Hiiii!");
-        println!("Mazic: This engine uses the following dependencies in much appreciation:");
-
-        println!("        sdl2");
-        println!("        bit_field");
-        println!("\nThank you all for all your hard work!\n");
-
-		println!("Mazic: Initializing...");
-
         TemplateEngine {
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
