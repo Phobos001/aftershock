@@ -1,5 +1,6 @@
 use aftershock::rasterizer::*;
 use aftershock::vectors::*;
+use aftershock::matricies::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::assets::*;
@@ -7,11 +8,18 @@ use aftershock::assets::*;
 use std::time::Instant;
 
 use sdl2::event::Event;
-
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::{PixelFormatEnum};
 
 const RENDER_WIDTH: usize = 512;
 const RENDER_HEIGHT: usize = 512;
+
+const CONTROL_ROTATE_LEFT: u8   = 0;
+const CONTROL_ROTATE_RIGHT: u8  = 1;
+const CONTROL_THRUST_FORWARD: u8     = 2;
+const CONTROL_THRUST_BACKWARD: u8   = 3;
+const CONTROL_FIRE: u8   = 4;
+const CONTROL_PAUSE: u8  = 5;
 
 pub enum VideoMode {
     Exclusive,
@@ -19,10 +27,44 @@ pub enum VideoMode {
     Windowed,
 }
 
-pub struct Asteroids {
+pub struct Player {
+    pub velocity: Vec2,
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+}
+
+pub struct Asteroid {
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+}
+
+pub struct Bullets {
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+}
+
+/// If the squared distance between the two points is smaller than the combined radius's squared, then the two circles are overlapping!
+pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
+    (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
+}
+
+pub struct AsteroidsEngine {
+
+    pub player: Player,
+    pub asteroids: Vec<Asteroid>,
+
     pub rasterizer: Rasterizer,
 
     pub video_mode: VideoMode,
+
+    pub controls: u8,
+    pub controls_last: u8,
 
     pub realtime: f32,
     pub timescale: f32,
@@ -33,18 +75,23 @@ pub struct Asteroids {
     pub dt_unscaled: f32,
 
     dt_before: Instant,
-
 }
 
-impl Asteroids {
-    pub fn new() -> Asteroids {
+impl AsteroidsEngine {
+    pub fn new() -> AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
-        Asteroids {
+        AsteroidsEngine {
+
+            player: Player { velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one() },
+            asteroids: Vec::new(),
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
             video_mode: VideoMode::Windowed,
+
+            controls: 0,
+            controls_last: 0,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -114,25 +161,24 @@ impl Asteroids {
         canvas.present();
         let mut event_pump = sdl_context.event_pump().unwrap();
 
+        self.rasterizer.wrapping = true;
+
         // ==== Actual engine stuff ====
 		// Font for drawing FPS and such
 
 		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
-		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 5.0);
+		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
 
         let mut printtime: f32 = 0.0;
-
         'running: loop {
             self.update_times();
             
-			canvas.clear();
-			
 			for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit {..} => {
                         break 'running
                     },
-                    _ => {}
+                    _ => {},
                 }
             }
 
@@ -143,15 +189,34 @@ impl Asteroids {
                 printtime = 0.0;
             }
 
-            
+            // == UPDATING ==
+            canvas.clear();
+
+            self.update_controls(&event_pump);
+
+            if self.is_control_down(CONTROL_ROTATE_LEFT) {
+                self.player.rotation += self.dt * 3.0;
+            }
+
+            if self.is_control_down(CONTROL_ROTATE_RIGHT) {
+                self.player.rotation -= self.dt * 3.0;
+            }
+
+            if self.is_control_down(CONTROL_THRUST_FORWARD) {
+                let direction = Mat3::rotated(self.player.rotation);
+
+                // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
+                // Also we assume right is the starting rotation direction because of how we draw the player
+                self.player.velocity += direction.forward(Vec2::right() * 8.0) * self.dt;
+            }
+
+            self.player.position += self.player.velocity * self.dt;
+            self.player.position %= RENDER_WIDTH as f32;
+
+            // == DRAWING ==
             self.rasterizer.cls();
-
-
-            let total_pixels = self.rasterizer.drawn_pixels_since_cls;
-			sys_spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels);
-			sys_spritefont.scale = Vec2::new(2.0, 2.0);
-			sys_spritefont.position = Vec2::new(8.0, 8.0);
-			sys_spritefont.draw(&mut self.rasterizer);
+            self.draw_player();
+            self.draw_performance_text(&mut sys_spritefont);
             
             // Present to screen
             let _ = screentex.update(None, &self.rasterizer.framebuffer.color, (RENDER_WIDTH * 4) as usize);
@@ -166,6 +231,79 @@ impl Asteroids {
         }
 
         return 0;
+    }
+
+    pub fn is_control_down(&mut self, control: u8) -> bool {
+        return self.controls & (1 << control) != 0;
+    }
+
+    pub fn is_control_pressed(&mut self, control: u8) -> bool {
+        !(self.controls_last & (1 << control) != 0) && (self.controls & (1 << control) != 0)
+    }
+
+    pub fn is_control_released(&mut self, control: u8) -> bool {
+        (self.controls_last & (1 << control) != 0) && !(self.controls & (1 << control) != 0)
+    }
+
+    pub fn update_controls(&mut self, event_pump: &sdl2::EventPump) {
+        let keys: Vec<Keycode> = event_pump.keyboard_state().pressed_scancodes().filter_map(Keycode::from_scancode).collect();
+
+        self.controls_last = self.controls;
+        self.controls = 0;
+        
+        for key in keys.iter() {
+            match key {
+                Keycode::Left => { self.controls    |= 1 << CONTROL_ROTATE_LEFT; },
+                Keycode::Right => { self.controls   |= 1 << CONTROL_ROTATE_RIGHT; },
+                Keycode::Up => { self.controls      |= 1 << CONTROL_THRUST_FORWARD; },
+                Keycode::Down => { self.controls    |= 1 << CONTROL_THRUST_BACKWARD; },
+                Keycode::Space => { self.controls   |= 1 << CONTROL_FIRE; },
+                Keycode::Escape => { self.controls   |= 1 << CONTROL_PAUSE; },
+                _ => {},
+            }
+        }
+    }
+
+    pub fn draw_player(&mut self) {
+        // We need this 3x3 matrix for player rotation
+        let translated: Mat3 = Mat3::translated(self.player.position);
+        let rotated: Mat3 = Mat3::rotated(self.player.rotation);
+        let scaled: Mat3 = Mat3::scaled(self.player.scale);
+
+        let mtx = translated * rotated * scaled;
+
+        // Defines an arrow looking thing to represent the player
+        let player_points = [
+            Vec2::new(8.0, 0.0),
+            Vec2::new(-8.0, 8.0),
+            Vec2::new(-5.0, 0.0),
+            Vec2::new(-8.0, -8.0),
+        ];
+
+        // Transform points into world space
+        let mtx_line0 = mtx.forward(player_points[0]);
+        let mtx_line1 = mtx.forward(player_points[1]);
+        let mtx_line2 = mtx.forward(player_points[2]);
+        let mtx_line3 = mtx.forward(player_points[3]);
+
+        // Draw lines to rasterizer
+        self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
+        self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
+        self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
+        self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
+    }
+
+    pub fn draw_asteroids(&mut self) {
+
+    }
+
+    pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
+        let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+        spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls);
+        spritefont.scale = Vec2::new(2.0, 2.0);
+        spritefont.position = Vec2::new(8.0, 8.0);
+        spritefont.opacity = 32;
+        spritefont.draw(&mut self.rasterizer);
     }
 
     pub fn update_times(&mut self) {
@@ -186,7 +324,7 @@ impl Asteroids {
 
 pub fn main() {
     
-    let mut engine = Asteroids::new();
+    let mut engine = AsteroidsEngine::new();
     let mut hardware_accelerated: bool = true;
 
     let args: Vec<_> = std::env::args().collect();
