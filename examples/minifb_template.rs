@@ -24,9 +24,6 @@ pub struct TemplateEngine {
     pub dt: f32,
     pub dt_unscaled: f32,
 
-    pub game_hz: u32,
-    game_hz_timer: f32,
-
     dt_before: Instant,
 
 }
@@ -44,9 +41,6 @@ impl TemplateEngine {
             tics: 0,
             fps: 0,
             fps_print: 0,
-
-            game_hz: 9999, // Controls how often things are updated
-            game_hz_timer: 0.0,
 		}
 	}
 
@@ -98,48 +92,41 @@ impl TemplateEngine {
                 printtime = 0.0;
             }
 
-            // Only update the game at a certain rate
-            self.game_hz_timer -= self.dt_unscaled;
-            if self.game_hz_timer <= 0.0 {
-                self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
 
-                // High level spritefont example
-                spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
-                spritefont_test.scale = Vec2::one() * self.realtime.cos();
-                spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
-                spritefont_test.draw(&mut self.rasterizer);
+            // High level spritefont example
+            spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
+            spritefont_test.scale = Vec2::one() * self.realtime.cos();
+            spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
+            spritefont_test.draw(&mut self.rasterizer);
 
-                // Image drawing
-                self.rasterizer.pimg(&scotty, 64, 64);
+            // Image drawing
+            self.rasterizer.pimg(&scotty, 64, 64);
 
-                // Image drawing but T R A N S P A R E N T
-                self.rasterizer.set_draw_mode(DrawMode::Alpha);
-                self.rasterizer.opacity = 128;
-                self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
-                self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
-                self.rasterizer.opacity = 255;
-                self.rasterizer.set_draw_mode(DrawMode::Opaque);
+            // Image drawing but T R A N S P A R E N T
+            self.rasterizer.set_draw_mode(DrawMode::Alpha);
+            self.rasterizer.opacity = 128;
+            self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
+            self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
+            self.rasterizer.opacity = 255;
+            self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
-                let total_pixels = self.rasterizer.drawn_pixels_since_cls;
-                self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
-                
-                // combine the colors into u32 instead of 4's of u8
-                let colors_u32: Vec<u32> = self.rasterizer.framebuffer.color.chunks_exact(4)
-                    .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
-                    .collect();
+            let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+            self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
+            
+            // combine the colors into u32 instead of 4's of u8
+            let colors_u32: Vec<u32> = self.rasterizer.framebuffer.color.chunks_exact(4)
+                .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
+                .collect();
 
-                // Present
-                window
-                    .update_with_buffer(colors_u32.as_slice(), RENDER_WIDTH, RENDER_HEIGHT)
-                    .unwrap();
-                
-                // Book keeping
-                self.tics += 1;
-                self.fps += 1;
-
-                // Set the new update delay
-                self.game_hz_timer = 1.0 / self.game_hz as f32;
-            }
+            // Present
+            window
+                .update_with_buffer(colors_u32.as_slice(), RENDER_WIDTH, RENDER_HEIGHT)
+                .unwrap();
+            
+            // Book keeping
+            self.tics += 1;
+            self.fps += 1;
 
             std::thread::sleep(std::time::Duration::from_micros(1));
         }

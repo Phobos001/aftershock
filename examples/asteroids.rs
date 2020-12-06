@@ -10,8 +10,8 @@ use sdl2::event::Event;
 
 use sdl2::pixels::{PixelFormatEnum};
 
-const RENDER_WIDTH: usize = 640;
-const RENDER_HEIGHT: usize = 360;
+const RENDER_WIDTH: usize = 512;
+const RENDER_HEIGHT: usize = 512;
 
 pub enum VideoMode {
     Exclusive,
@@ -19,7 +19,7 @@ pub enum VideoMode {
     Windowed,
 }
 
-pub struct TemplateEngine {
+pub struct Asteroids {
     pub rasterizer: Rasterizer,
 
     pub video_mode: VideoMode,
@@ -36,22 +36,15 @@ pub struct TemplateEngine {
 
 }
 
-impl TemplateEngine {
-    pub fn new() -> TemplateEngine {
-        println!("Mazic: Hiiii!");
-        println!("Mazic: This engine uses the following dependencies in much appreciation:");
+impl Asteroids {
+    pub fn new() -> Asteroids {
+        println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
-        println!("        sdl2");
-        println!("        bit_field");
-        println!("\nThank you all for all your hard work!\n");
-
-		println!("Mazic: Initializing...");
-
-        TemplateEngine {
+        Asteroids {
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
-            video_mode: VideoMode::Fullscreen,
+            video_mode: VideoMode::Windowed,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -113,7 +106,7 @@ impl TemplateEngine {
         let texture_creator = canvas.texture_creator();
 
         // This is what we update our buffers to
-        let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA8888, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
+        let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA32, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
             .map_err(|e| e.to_string()).unwrap();
 
         canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
@@ -124,18 +117,8 @@ impl TemplateEngine {
         // ==== Actual engine stuff ====
 		// Font for drawing FPS and such
 
-        let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
-        let sysfont: Font = Font::new("core/tiny_font.png", font_glyphidx, 5, 5, -1);
-
-        // Spritefont example. More flexible than the standard pprint but also more expensive.
-        let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 8.0);
-        spritefont_test.position = Vec2::new(256.0, 128.0);
-
-        // Image example
-        let scotty = Image::new("core/scotty_transparent.png");
-
-        // Image example for transparency
-        let graphics_and_shit = Image::new("core/default.png");
+		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
+		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 5.0);
 
         let mut printtime: f32 = 0.0;
 
@@ -161,27 +144,14 @@ impl TemplateEngine {
             }
 
             
-            self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            self.rasterizer.cls();
 
-            // High level spritefont example
-            spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
-            spritefont_test.scale = Vec2::one() * self.realtime.cos();
-            spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
-            spritefont_test.draw(&mut self.rasterizer);
-
-            // Image drawing
-            self.rasterizer.pimg(&scotty, 64, 64);
-
-            // Image drawing but T R A N S P A R E N T
-            self.rasterizer.set_draw_mode(DrawMode::Alpha);
-            self.rasterizer.opacity = 128;
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
-            self.rasterizer.opacity = 255;
-            self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
             let total_pixels = self.rasterizer.drawn_pixels_since_cls;
-            self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
+			sys_spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels);
+			sys_spritefont.scale = Vec2::new(2.0, 2.0);
+			sys_spritefont.position = Vec2::new(8.0, 8.0);
+			sys_spritefont.draw(&mut self.rasterizer);
             
             // Present to screen
             let _ = screentex.update(None, &self.rasterizer.framebuffer.color, (RENDER_WIDTH * 4) as usize);
@@ -216,7 +186,7 @@ impl TemplateEngine {
 
 pub fn main() {
     
-    let mut engine = TemplateEngine::new();
+    let mut engine = Asteroids::new();
     let mut hardware_accelerated: bool = true;
 
     let args: Vec<_> = std::env::args().collect();

@@ -218,8 +218,8 @@ pub struct Rasterizer {
     pub draw_mode: DrawMode,
     pub tint: Color,
     pub opacity: u8,
+    pub wrapping: bool,
 
-    pub collected_pixels: Vec<(i32, i32)>,
     pub camera_x: i32,
     pub camera_y: i32,
     pub drawn_pixels_since_cls: u64,
@@ -238,15 +238,16 @@ impl Rasterizer {
         Rasterizer {
             pset_op: pset_opaque,
             framebuffer: FrameBuffer::new(width, height),
+
             draw_mode: DrawMode::Opaque,
             tint: Color::white(),
             opacity: 255,
+            wrapping: false,
+
             camera_x: 0,
             camera_y: 0,
             drawn_pixels_since_cls: 0,
             time_since_cls: std::time::Duration::new(0, 0),
-
-            collected_pixels: Vec::new(),
         }
     }
 
@@ -288,18 +289,23 @@ impl Rasterizer {
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
-        let x = -self.camera_x as i32 + x;
-        let y = -self.camera_y as i32 + y;
+        let mut x = -self.camera_x as i32 + x;
+        let mut y = -self.camera_y as i32 + y;
 
-        let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
-    
-        let out_left: bool = x < 0;
-        let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
-        let out_top: bool = y < 0;
-        let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
-        let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
+        let mut idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+        if !self.wrapping {
+            let out_left: bool = x < 0;
+            let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
+            let out_top: bool = y < 0;
+            let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
+            let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
 
-        if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
+            if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
+        } else {
+            x = x % self.framebuffer.width as i32;
+            y = y % self.framebuffer.height as i32;
+            idx = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+        }
         
         // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
         (self.pset_op)(self, idx, color);
