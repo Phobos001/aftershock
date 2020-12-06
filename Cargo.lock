@@ -14,6 +14,7 @@ dependencies = [
  "minifb",
  "rgb",
  "sdl2 0.34.3",
+ "soloud",
 ]
 
 [[package]]
@@ -57,6 +58,15 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "cmake"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "crc32fast"
@@ -454,6 +464,48 @@ name = "smallvec"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7acad6f34eb9e8a259d3283d1e8c1d34d7415943d4895f65cc73813c7396fc85"
+
+[[package]]
+name = "soloud"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12548e45ddeb5a1e25070fef95efdf6ea738c0519181b739b3bb21b72bc74682"
+dependencies = [
+ "bitflags 1.2.1",
+ "soloud-derive",
+ "soloud-sys",
+]
+
+[[package]]
+name = "soloud-derive"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c910b6f5a3619a894fac37042048ef54d3c81d1810b85b6e0beff10b904241f4"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "soloud-sys"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed61275cfdcd914ee8041dbe8174bdabf13ee3c7b6301cab9930268229aa84fe"
+dependencies = [
+ "cmake",
+ "libc",
+]
+
+[[package]]
+name = "syn"
+version = "1.0.53"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8833e20724c24de12bbaba5ad230ea61c3eafb05b881c7c9d3cfe8638b187e68"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
+]
 
 [[package]]
 name = "tempfile"

@@ -13,6 +13,7 @@ pub mod drawables;
 pub mod matricies;
 pub mod vectors;
 pub mod color;
+pub mod random;
 
 pub mod all {
 	pub use crate::rasterizer::*;
@@ -22,4 +23,5 @@ pub mod all {
 	pub use crate::matricies::*;
 	pub use crate::vectors::*;
 	pub use crate::color::*;
+	pub use crate::random::*;
 }

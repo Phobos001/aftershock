@@ -4,6 +4,7 @@ use aftershock::matricies::*;
 use aftershock::math::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
+use aftershock::random::*;
 use aftershock::assets::*;
 
 use std::time::Instant;
@@ -38,24 +39,59 @@ pub struct Player {
     pub scale: Vec2,
 }
 
-pub struct Asteroid {
-    pub position: Vec2,
-    pub rotation: f32,
-    pub radius: f32,
-    pub scale: Vec2,
+pub struct Asteroids {
+    pub velocity: Vec<Vec2>,
+    pub position: Vec<Vec2>,
+    pub rotation: Vec<f32>,
+    pub radius: Vec<f32>,
+    pub scale: Vec<Vec2>,
+}
+
+impl Asteroids {
+    pub fn new() -> Asteroids {
+        Asteroids {
+            velocity: Vec::new(),
+            position: Vec::new(),
+            rotation: Vec::new(),
+            radius: Vec::new(),
+            scale: Vec::new(),
+        }
+    }
+
+    pub fn spawn(&mut self, position: Vec2, velocity: Vec2, rotation: f32,  radius: f32, scale: Vec2) {
+        self.position.push(position);
+        self.velocity.push(velocity);
+        self.rotation.push(rotation);
+        self.radius.push(radius);
+        self.scale.push(scale);
+    }
+}
+
+impl Bullets {
+    pub fn new() -> Bullets {
+        Bullets {
+            velocity: Vec::new(),
+            position: Vec::new(),
+            rotation: Vec::new(),
+            radius: Vec::new(),
+            scale: Vec::new(),
+        }
+    }
 }
 
 pub struct Bullets {
-    pub position: Vec2,
-    pub rotation: f32,
-    pub radius: f32,
-    pub scale: Vec2,
+    pub velocity: Vec<Vec2>,
+    pub position: Vec<Vec2>,
+    pub rotation: Vec<f32>,
+    pub radius: Vec<f32>,
+    pub scale: Vec<Vec2>,
 }
 
 pub struct AsteroidsEngine {
 
     pub player: Player,
-    pub asteroids: Vec<Asteroid>,
+    pub asteroids: Asteroids,
+    pub bullets: Bullets,
 
     pub rasterizer: Rasterizer,
 
@@ -65,6 +101,9 @@ pub struct AsteroidsEngine {
     pub controls_last: u8,
 
     pub paused: bool,
+
+    pub rng: Random,
+    pub rng_number: f32,
 
     pub debug_collision: bool,
     pub debug_info: bool,
@@ -85,9 +124,12 @@ impl AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
         AsteroidsEngine {
+            rng: Random::new(0, 0),
+            rng_number: 0.0,
 
             player: Player { velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one() },
-            asteroids: Vec::new(),
+            asteroids: Asteroids::new(),
+            bullets: Bullets::new(),
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
@@ -177,6 +219,9 @@ impl AsteroidsEngine {
 		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
 
+        let rng_average_result: f64 = self.rng.test_randf_average();
+        println!("{}", rng_average_result);
+
         let mut printtime: f32 = 0.0;
         'running: loop {
             self.update_times();
@@ -195,6 +240,7 @@ impl AsteroidsEngine {
                 self.fps_print = self.fps;
                 self.fps = 0;
                 printtime = 0.0;
+                self.rng_number = self.rng.randf();
             }
 
             // == CONTROLS ==
@@ -220,6 +266,7 @@ impl AsteroidsEngine {
             // == UPDATING ==
             // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
             canvas.clear();
+            
             if !self.paused {
                 if self.is_control_down(CONTROL_ROTATE_LEFT) {
                     self.player.rotation += self.dt * 3.0;
@@ -247,11 +294,13 @@ impl AsteroidsEngine {
 
                 self.player.position += self.player.velocity * self.dt;
                 self.player.position %= RENDER_WIDTH as f32;
+            }
 
-                // == DRAWING ==
-                self.rasterizer.cls();
-                self.draw_player();
-            } else {
+            // == DRAWING ==
+            self.rasterizer.cls();
+            self.draw_player();
+
+            if self.paused {
                 self.rasterizer.set_draw_mode(DrawMode::Alpha);
                 self.rasterizer.opacity = if modf(self.realtime, 0.5) > 0.25 { 255 } else { 0 };
                 self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::white());
@@ -321,7 +370,7 @@ impl AsteroidsEngine {
 
     pub fn draw_player(&mut self) {
         
-        // We need this 3x3 matrix for player rotation
+        // Prepare a transformation chain to get our final transformation matrix
         let translated: Mat3 = Mat3::translated(self.player.position);
         let rotated: Mat3 = Mat3::rotated(self.player.rotation);
         let scaled: Mat3 = Mat3::scaled(self.player.scale);
@@ -358,7 +407,7 @@ impl AsteroidsEngine {
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
         let total_pixels = self.rasterizer.drawn_pixels_since_cls;
-        spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls);
+        spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
         spritefont.scale = Vec2::new(2.0, 2.0);
         spritefont.position = Vec2::new(8.0, 8.0);
         spritefont.opacity = 128;
