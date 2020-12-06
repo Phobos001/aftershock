@@ -6,6 +6,14 @@ pub fn clampi(value: i32, min: i32, max: i32) -> i32 {
 	if value < min { min } else if value > max { max } else { value }
 }
 
+pub fn modf(value: f32, rhs: f32) -> f32 {
+	((value % rhs) + rhs) % rhs
+}
+
+pub fn modi(value: i32, rhs: i32) -> i32 {
+	((value % rhs) + rhs) % rhs
+}
+
 pub fn signf(value: f32) -> f32 {
 	if value > 0.0 { 1.0 } else if value < 0.0 { -1.0 } else { 0.0 }
 }

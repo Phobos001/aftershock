@@ -153,8 +153,8 @@ impl std::ops::Rem<f32> for Vec2 {
 
 	fn rem(self, rhs: f32) -> Self {
 		Self {
-			x: self.x % rhs,
-			y: self.y % rhs,
+			x: modf(self.x, rhs),
+			y: modf(self.y, rhs),
 		}
 	}
 }
@@ -207,8 +207,8 @@ impl std::ops::DivAssign<f32> for Vec2 {
 impl std::ops::RemAssign<f32> for Vec2 {
 	fn rem_assign(&mut self, rhs: f32) {
 		*self = Self {
-			x: self.x % rhs,
-			y: self.y % rhs,
+			x: modf(self.x, rhs),
+			y: modf(self.y, rhs),
 		}
 	}
 }

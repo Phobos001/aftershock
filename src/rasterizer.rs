@@ -302,9 +302,10 @@ impl Rasterizer {
 
             if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
         } else {
-            x = x % self.framebuffer.width as i32;
-            y = y % self.framebuffer.height as i32;
+            x = modi(x, self.framebuffer.width as i32);
+            y = modi(y, self.framebuffer.height as i32);
             idx = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+            if idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1 { return; }
         }
         
         // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
