@@ -162,11 +162,12 @@ impl AsteroidsEngine {
 
         println!("SDL Version: {}", sdl2::version::version());
 
+        let title = "Asteroids!";
         let window = {
             match self.video_mode {
                 VideoMode::Exclusive => {
                     video_subsystem
-                    .window("Aftershock!", RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
+                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
                     .fullscreen()
                     .position_centered()
                     .build()
@@ -174,7 +175,7 @@ impl AsteroidsEngine {
                 },
                 VideoMode::Fullscreen => {
                     video_subsystem
-                    .window("Aftershock!", RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
+                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
                     .fullscreen_desktop()
                     .position_centered()
                     .build()
@@ -182,7 +183,7 @@ impl AsteroidsEngine {
                 },
                 VideoMode::Windowed => {
                     video_subsystem
-                    .window("Aftershock!", RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
+                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
                     .resizable()
                     .position_centered()
                     .build()
@@ -218,9 +219,6 @@ impl AsteroidsEngine {
 
 		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
-
-        let rng_average_result: f64 = self.rng.test_randf_average();
-        println!("{}", rng_average_result);
 
         let mut printtime: f32 = 0.0;
         'running: loop {
