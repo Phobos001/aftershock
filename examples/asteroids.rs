@@ -24,7 +24,6 @@ const CONTROL_FIRE: u8   = 4;
 const CONTROL_PAUSE: u8  = 5;
 const CONTROL_DEBUG_COLLISION: u8 = 6;
 const CONTROL_DEBUG_INFO: u8 = 7;
-const TEST_ADD_FOR_GITHUB: u8 = 256;
 
 pub enum VideoMode {
     Exclusive,
