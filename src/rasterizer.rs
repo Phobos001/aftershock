@@ -234,7 +234,7 @@ impl Rasterizer {
     /// * 'width' - Horizontal size of the framebuffer.
     /// * 'height' - Vertical size of the framebuffer.
     pub fn new(width: usize, height: usize) -> Rasterizer {
-        println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
+        //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
             framebuffer: FrameBuffer::new(width, height),

@@ -24,7 +24,7 @@ impl Image {
 	pub fn new(path_to: &str) -> Image {
 		match lodepng::decode32_file(path_to) {
 			Ok(image) => {
-				println!("Image: {}, Res: {} x {}, Size: {}B", path_to, image.width, image.height, image.buffer.len());
+				//println!("Image: {}, Res: {} x {}, Size: {}B", path_to, image.width, image.height, image.buffer.len());
 				let buffer_new: Vec<u8> =  image.buffer.as_bytes().to_vec();
 
 				return Image {
@@ -105,7 +105,7 @@ impl Font {
 			println!("ERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
 		}
 
-		println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);
+		//println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);
 
 		Font {
 			glyphidx,
