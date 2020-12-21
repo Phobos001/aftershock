@@ -137,6 +137,17 @@ impl std::ops::Div for Vec2 {
 	}
 }
 
+impl std::ops::Rem for Vec2 {
+	type Output = Self;
+
+	fn rem(self, rhs: Vec2) -> Self {
+		Self {
+			x: modf(self.x, rhs.x),
+			y: modf(self.y, rhs.y),
+		}
+	}
+}
+
 impl std::ops::Div<f32> for Vec2 {
 	type Output = Self;
 
@@ -184,6 +195,15 @@ impl std::ops::MulAssign for Vec2 {
             y: self.y * rhs.y,
         };
     }
+}
+
+impl std::ops::RemAssign for Vec2 {
+	fn rem_assign(&mut self, rhs: Vec2) {
+		*self = Self {
+			x: modf(self.x, rhs.x),
+			y: modf(self.y, rhs.y),
+		}
+	}
 }
 
 impl std::ops::MulAssign<f32> for Vec2 {

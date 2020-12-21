@@ -105,6 +105,7 @@ pub enum DrawMode {
     Divide,
     InvertedAlpha,
     InvertedOpaque,
+    Collect,
 }
 
 /// Draw pixels if they are fully opaque, otherwise ignore them.
@@ -210,6 +211,16 @@ fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
+/// Collect drawn pixels into collected_pixels instead of drawing them to the buffer.
+/// This is useful for more advanced graphical effects, for example using a series of ptriangle's to
+/// build a polygonal area, then drawing a texture onto the pixels.
+fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    let idx_unstrided = idx / 4;
+    let x = modi(idx_unstrided as i32, rasterizer.framebuffer.width as i32);
+    let y = idx_unstrided as i32 / rasterizer.framebuffer.width as i32;
+    rasterizer.collected_pixels.push((x, y, color));
+}
+
 /// Drawing switchboard that draws directly into a framebuffer. Drawing options like Tint and Opacity must be manually changed by the user.
 pub struct Rasterizer {
     pset_op: PSetOp,
@@ -219,6 +230,8 @@ pub struct Rasterizer {
     pub tint: Color,
     pub opacity: u8,
     pub wrapping: bool,
+
+    pub collected_pixels: Vec<(i32, i32, Color)>,
 
     pub camera_x: i32,
     pub camera_y: i32,
@@ -244,6 +257,8 @@ impl Rasterizer {
             opacity: 255,
             wrapping: false,
 
+            collected_pixels: Vec::new(),
+
             camera_x: 0,
             camera_y: 0,
             drawn_pixels_since_cls: 0,
@@ -262,6 +277,7 @@ impl Rasterizer {
             DrawMode::Multiply => {self.pset_op = pset_multiply;}
             DrawMode::InvertedAlpha => {self.pset_op = pset_inverted_alpha;}
             DrawMode::InvertedOpaque => {self.pset_op = pset_inverted_opaque;}
+            DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
         }
     }
@@ -285,7 +301,10 @@ impl Rasterizer {
         self.drawn_pixels_since_cls = 0;
     }
 
-    
+    /// Clears the collected_pixels buffer. Does not resize to zero.
+    pub fn cls_collected(&mut self) {
+        self.collected_pixels.clear();
+    }
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
@@ -366,46 +385,6 @@ impl Rasterizer {
             if err2 < dy { err += dx; y0 += sy; }
         }
     }
-
-    /// Returns pixel positions across the line instead of drawing them.
-    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
-
-        let mut pixels: Vec<(i32, i32)> = Vec::new();
-
-        // Create local variables for moving start point
-        let mut x0 = x0;
-        let mut y0 = y0;
-    
-        // Get absolute x/y offset
-        let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
-        let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
-    
-        // Get slopes
-        let sx = if x0 < x1 { 1 } else { -1 };
-        let sy = if y0 < y1 { 1 } else { -1 };
-    
-        // Initialize error
-        let mut err = if dx > dy { dx } else {-dy} / 2;
-        let mut err2;
-    
-        loop {
-            // Set pixel
-            pixels.push((x0, y0));
-    
-            // Check end condition
-            if x0 == x1 && y0 == y1 { break };
-    
-            // Store old error
-            err2 = 2 * err;
-    
-            // Adjust error and start position
-            if err2 > -dx { err -= dy; x0 += sx; }
-            if err2 < dy { err += dx; y0 += sy; }
-        }
-
-        return pixels;
-    }
-    
     
     /// Draws a rectangle onto the screen. Can either be filled or outlined.
     pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
@@ -701,6 +680,48 @@ impl Rasterizer {
             self.pset(px2 as i32, py2 as i32, color);
             step += stride;
         }
+    }
+
+
+    // Collecting versions of drawing functions
+
+    /// Returns pixel positions across the line.
+    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+
+        let mut pixels: Vec<(i32, i32)> = Vec::new();
+
+        // Create local variables for moving start point
+        let mut x0 = x0;
+        let mut y0 = y0;
+    
+        // Get absolute x/y offset
+        let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
+        let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
+    
+        // Get slopes
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+    
+        // Initialize error
+        let mut err = if dx > dy { dx } else {-dy} / 2;
+        let mut err2;
+    
+        loop {
+            // Set pixel
+            pixels.push((x0, y0));
+    
+            // Check end condition
+            if x0 == x1 && y0 == y1 { break };
+    
+            // Store old error
+            err2 = 2 * err;
+    
+            // Adjust error and start position
+            if err2 > -dx { err -= dy; x0 += sx; }
+            if err2 < dy { err += dx; y0 += sy; }
+        }
+
+        return pixels;
     }
     
 }

@@ -5,7 +5,6 @@ use aftershock::math::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::random::*;
-use aftershock::assets::*;
 
 use std::time::Instant;
 
@@ -39,59 +38,87 @@ pub struct Player {
     pub scale: Vec2,
 }
 
-pub struct Asteroids {
-    pub velocity: Vec<Vec2>,
-    pub position: Vec<Vec2>,
-    pub rotation: Vec<f32>,
-    pub radius: Vec<f32>,
-    pub scale: Vec<Vec2>,
+pub struct Asteroid {
+    pub shape: [Vec2; 8],
+    pub velocity: Vec2,
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+    pub health: u8,
 }
 
-impl Asteroids {
-    pub fn new() -> Asteroids {
-        Asteroids {
-            velocity: Vec::new(),
-            position: Vec::new(),
-            rotation: Vec::new(),
-            radius: Vec::new(),
-            scale: Vec::new(),
+impl Asteroid {
+    pub fn new() -> Asteroid {
+        Asteroid {
+            shape: [Vec2::zero(); 8],
+            velocity: Vec2::zero(),
+            position: Vec2::zero(),
+            rotation: 0.0,
+            radius: 0.0,
+            scale: Vec2::one(),
+            health: 3,
         }
     }
 
-    pub fn spawn(&mut self, position: Vec2, velocity: Vec2, rotation: f32,  radius: f32, scale: Vec2) {
-        self.position.push(position);
-        self.velocity.push(velocity);
-        self.rotation.push(rotation);
-        self.radius.push(radius);
-        self.scale.push(scale);
+    pub fn generate_shape(radius: f32, rng: &mut Random) -> [Vec2; 8] {
+        let mut points: [Vec2; 8] = [
+            Vec2::new(1.0, 0.0), // Right
+            Vec2::new(0.5, 0.5), // Bottom Right
+            Vec2::new(0.0, 1.0), // Bottom
+            Vec2::new(-0.5, 0.5), // Bottom Left
+            Vec2::new(-1.0, 0.0), // Left
+            Vec2::new(-0.5, -0.5), // Top Left
+            Vec2::new(0.0, -1.0), // Top
+            Vec2::new(0.5, -0.5), // Top Right
+        ];
+
+        for p in points.iter_mut() {
+            *p *= radius;
+            *p += Vec2::new(rng.randf_range(-2.0, 2.0), rng.randf_range(-2.0, 2.0));
+        }
+
+        points
     }
+}
+
+pub struct Bullets {
+    pub velocity: Vec2,
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+    pub lifetime: f32,
 }
 
 impl Bullets {
     pub fn new() -> Bullets {
         Bullets {
-            velocity: Vec::new(),
-            position: Vec::new(),
-            rotation: Vec::new(),
-            radius: Vec::new(),
-            scale: Vec::new(),
+            velocity: Vec2::zero(),
+            position: Vec2::zero(),
+            rotation: 0.0,
+            radius: 0.0,
+            scale: Vec2::one(),
+            lifetime: 0.0,
         }
+    }
+
+    pub fn update(&mut self, dt: f32, idx: usize) {
+        self.position += self.velocity * dt;
+        self.position %= Vec2::new(RENDER_WIDTH as f32, RENDER_HEIGHT as f32);
     }
 }
 
-pub struct Bullets {
-    pub velocity: Vec<Vec2>,
-    pub position: Vec<Vec2>,
-    pub rotation: Vec<f32>,
-    pub radius: Vec<f32>,
-    pub scale: Vec<Vec2>,
+/// If the squared distance between the two points is smaller than the combined radius's squared, then the two circles are overlapping!
+pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
+    (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
 }
 
 pub struct AsteroidsEngine {
 
     pub player: Player,
-    pub asteroids: Asteroids,
-    pub bullets: Bullets,
+    pub asteroids: Vec<Asteroid>,
+    pub bullets: Vec<Bullets>,
 
     pub rasterizer: Rasterizer,
 
@@ -127,9 +154,9 @@ impl AsteroidsEngine {
             rng: Random::new(0, 0),
             rng_number: 0.0,
 
-            player: Player { velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one() },
-            asteroids: Asteroids::new(),
-            bullets: Bullets::new(),
+            player: Player { velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one()},
+            asteroids: Vec::new(),
+            bullets: Vec::new(),
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
@@ -159,8 +186,6 @@ impl AsteroidsEngine {
         // Init SDL and surface texture
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
-
-        println!("SDL Version: {}", sdl2::version::version());
 
         let title = "Asteroids!";
         let window = {
@@ -265,37 +290,17 @@ impl AsteroidsEngine {
             // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
             canvas.clear();
             
+            
             if !self.paused {
-                if self.is_control_down(CONTROL_ROTATE_LEFT) {
-                    self.player.rotation += self.dt * 3.0;
-                }
-    
-                if self.is_control_down(CONTROL_ROTATE_RIGHT) {
-                    self.player.rotation -= self.dt * 3.0;
-                }
-    
-                if self.is_control_down(CONTROL_THRUST_FORWARD) {
-                    let direction = Mat3::rotated(self.player.rotation);
-    
-                    // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
-                    // Also we assume right is the starting rotation direction because of how we draw the player
-                    self.player.velocity += direction.forward(Vec2::right() * 64.0) * self.dt;
-                }
-    
-                if self.is_control_down(CONTROL_THRUST_BACKWARD) {
-                    let direction = Mat3::rotated(self.player.rotation);
-    
-                    // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
-                    // Also we assume right is the starting rotation direction because of how we draw the player
-                    self.player.velocity -= direction.forward(Vec2::right() * 64.0) * self.dt;
-                }
-
-                self.player.position += self.player.velocity * self.dt;
-                self.player.position %= RENDER_WIDTH as f32;
+                // Player
+                self.update_player();
+                self.update_asteroids();
+                self.update_bullets();
             }
 
             // == DRAWING ==
             self.rasterizer.cls();
+            self.draw_bullets();
             self.draw_player();
 
             if self.paused {
@@ -366,6 +371,50 @@ impl AsteroidsEngine {
         }
     }
 
+    pub fn update_player(&mut self) {
+        if self.is_control_down(CONTROL_ROTATE_LEFT) {
+            self.player.rotation += self.dt * 3.0;
+        }
+
+        if self.is_control_down(CONTROL_ROTATE_RIGHT) {
+            self.player.rotation -= self.dt * 3.0;
+        }
+
+        if self.is_control_down(CONTROL_THRUST_FORWARD) {
+            let direction = Mat3::rotated(self.player.rotation);
+
+            // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
+            // Also we assume right is the starting rotation direction because of how we draw the player
+            self.player.velocity += direction.forward(Vec2::right() * 64.0) * self.dt;
+        }
+
+        if self.is_control_down(CONTROL_THRUST_BACKWARD) {
+            let direction = Mat3::rotated(self.player.rotation);
+
+            // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
+            // Also we assume right is the starting rotation direction because of how we draw the player
+            self.player.velocity -= direction.forward(Vec2::right() * 64.0) * self.dt;
+        }
+
+        if self.is_control_pressed(CONTROL_FIRE) {
+            let direction = Mat3::rotated(self.player.rotation).forward(Vec2::right());
+            let offset = Mat3::translated(self.player.position).forward(direction * 16.0);
+            
+            //self.bullets.spawn(offset, direction * 128.0, 0.0, 2.0, Vec2::one());
+        }
+
+        self.player.position += self.player.velocity * self.dt;
+        self.player.position %= RENDER_WIDTH as f32;
+    }
+
+    pub fn update_asteroids(&mut self) {
+
+    }
+
+    pub fn update_bullets(&mut self) {
+
+    }
+
     pub fn draw_player(&mut self) {
         
         // Prepare a transformation chain to get our final transformation matrix
@@ -403,6 +452,10 @@ impl AsteroidsEngine {
 
     }
 
+    pub fn draw_bullets(&mut self) {
+        
+    }
+
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
         let total_pixels = self.rasterizer.drawn_pixels_since_cls;
         spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
@@ -414,11 +467,6 @@ impl AsteroidsEngine {
 
     pub fn draw_debug_collision(&mut self) {
         self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::green());
-    }
-
-    /// If the squared distance between the two points is smaller than the combined radius's squared, then the two circles are overlapping!
-    pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
-        (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
     }
 
     pub fn update_times(&mut self) {
