@@ -12,6 +12,7 @@ impl Random {
 	/// Requires a key to be picked for number generation. A unique combo of counter and key will provide the same number each time.
 	/// A single key can generate 2^64 random numbers
 	/// I suggest picking a starting counter position by using the walltime of the OS, or the realtime of the program
+	/// Or you can just start at zero and count up.
 	pub fn new(counter: u64, key: usize) -> Random {
 		Random {
 			key,
@@ -20,7 +21,7 @@ impl Random {
 	}
 
 	// Returns a random 64-bit unsigned integer
-	pub fn rand(&mut self) -> u64 {
+	fn rand(&mut self) -> u64 {
 		let mut x: u64 = self.counter * KEYS_TABLE[self.key];
 		let y: u64 = x;
 		let z: u64 = y + KEYS_TABLE[self.key];
@@ -36,14 +37,18 @@ impl Random {
 
 	// I think I did something wrong with rand(), because it only generates under a certain number? Or is that normal?
 	/// Returns a random float between 0 and 1
-	pub fn randf(&mut self) -> f32 {
+	pub fn randf_linear01(&mut self) -> f32 {
 		let remainder_limit: u64 = 20000000;
 		let rand: u64 = self.rand() % remainder_limit;
 		return (rand as f64 / remainder_limit as f64) as f32;
 	}
 
 	pub fn randf_range(&mut self, min: f32, max: f32) -> f32 {
-		lerpf(min, max, self.randf())
+		lerpf(min, max, self.randf_linear01())
+	}
+
+	pub fn randi_range(&mut self, min: i32, max: i32) -> i32 {
+		lerpi(min, max, self.randf_linear01())
 	}
 
 	/// Test that checks the uniformality of the random number generator

@@ -104,7 +104,7 @@ impl TemplateEngine {
         let texture_creator = canvas.texture_creator();
 
         // This is what we update our buffers to
-        let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA8888, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
+        let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA32, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
             .map_err(|e| e.to_string()).unwrap();
 
         canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
@@ -130,6 +130,9 @@ impl TemplateEngine {
 
         let mut printtime: f32 = 0.0;
 
+        let mut mouse_x: f32 = 0.0;
+        let mut mouse_y: f32 = 0.0;
+
         'running: loop {
             self.update_times();
             
@@ -143,6 +146,8 @@ impl TemplateEngine {
                     _ => {}
                 }
             }
+
+            let mouse_state = event_pump.mouse_state();
 
             printtime += self.dt_unscaled;
             if printtime > 1.0 {
@@ -160,8 +165,18 @@ impl TemplateEngine {
             spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
             spritefont_test.draw(&mut self.rasterizer);
 
-            // Image drawing
-            self.rasterizer.pimg(&scotty, 64, 64);
+            // Mouse Updating
+            let display_mode = video_subsystem.current_display_mode(0).unwrap();
+            let (window_width, window_height) = canvas.window().size();
+            let screen_width = display_mode.w as f32;
+            let screen_height = display_mode.h as f32;
+            mouse_x = mouse_state.x() as f32;
+            mouse_y = mouse_state.y() as f32;
+
+            mouse_x *= window_width as f32 / screen_width;
+            mouse_y *= window_height as f32 / screen_height;
+
+            self.rasterizer.pimg(&scotty, mouse_x as i32, mouse_y as i32);
 
             // Image drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);

@@ -224,12 +224,14 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 /// Drawing switchboard that draws directly into a framebuffer. Drawing options like Tint and Opacity must be manually changed by the user.
 pub struct Rasterizer {
     pset_op: PSetOp,
+    
     pub framebuffer: FrameBuffer,
 
     pub draw_mode: DrawMode,
     pub tint: Color,
     pub opacity: u8,
     pub wrapping: bool,
+    pub use_fast_alpha_blend: bool,
 
     pub collected_pixels: Vec<(i32, i32, Color)>,
 
@@ -256,6 +258,7 @@ impl Rasterizer {
             tint: Color::white(),
             opacity: 255,
             wrapping: false,
+            use_fast_alpha_blend: true,
 
             collected_pixels: Vec::new(),
 
@@ -279,6 +282,14 @@ impl Rasterizer {
             DrawMode::InvertedOpaque => {self.pset_op = pset_inverted_opaque;}
             DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
+        }
+    }
+
+    fn blend_color(&mut self, src: Color, dst: Color) -> Color {
+        if self.use_fast_alpha_blend {
+            Color::blend_fast(src, dst, self.opacity)
+        } else {
+            Color::blend(src, dst, self.opacity as f32 / 255.0)
         }
     }
 

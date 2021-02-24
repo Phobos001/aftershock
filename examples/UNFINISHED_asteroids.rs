@@ -1,3 +1,5 @@
+// Never completed this example. Sorry :(
+
 use aftershock::rasterizer::*;
 use aftershock::vectors::*;
 use aftershock::matricies::*;
@@ -79,6 +81,16 @@ impl Asteroid {
         }
 
         points
+    }
+
+    pub fn spawn(rng: &mut Random) -> Asteroid {
+        let mut asteroid = Asteroid::new();
+        asteroid.radius = rng.randf_range(4.0, 16.0);
+        asteroid.shape = Asteroid::generate_shape(asteroid.radius, rng);
+        asteroid.position = Vec2::new(rng.randf_range(0.0, RENDER_WIDTH as f32), rng.randf_range(0.0, RENDER_HEIGHT as f32));
+        asteroid.rotation = rng.randf_range(0.0, 6.28);
+        asteroid.velocity = Vec2::new(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * rng.randf_range(2.0, 16.0);
+        return asteroid;
     }
 }
 
@@ -237,8 +249,6 @@ impl AsteroidsEngine {
         canvas.present();
         let mut event_pump = sdl_context.event_pump().unwrap();
 
-        self.rasterizer.wrapping = true;
-
         // ==== Actual engine stuff ====
 		// Font for drawing FPS and such
 
@@ -246,6 +256,8 @@ impl AsteroidsEngine {
 		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
 
         let mut printtime: f32 = 0.0;
+
+        
         'running: loop {
             self.update_times();
             
@@ -263,7 +275,7 @@ impl AsteroidsEngine {
                 self.fps_print = self.fps;
                 self.fps = 0;
                 printtime = 0.0;
-                self.rng_number = self.rng.randf();
+                self.rng_number = self.rng.randf_linear01();
             }
 
             // == CONTROLS ==
@@ -362,6 +374,13 @@ impl AsteroidsEngine {
                 Keycode::Right => { self.controls    |= 1 << CONTROL_ROTATE_RIGHT; },
                 Keycode::Up => { self.controls       |= 1 << CONTROL_THRUST_FORWARD; },
                 Keycode::Down => { self.controls     |= 1 << CONTROL_THRUST_BACKWARD; },
+
+                // WASD Alternative
+                Keycode::A => { self.controls     |= 1 << CONTROL_ROTATE_LEFT; },
+                Keycode::D => { self.controls    |= 1 << CONTROL_ROTATE_RIGHT; },
+                Keycode::W => { self.controls       |= 1 << CONTROL_THRUST_FORWARD; },
+                Keycode::S => { self.controls     |= 1 << CONTROL_THRUST_BACKWARD; },
+
                 Keycode::Space => { self.controls    |= 1 << CONTROL_FIRE; },
                 Keycode::Escape => { self.controls   |= 1 << CONTROL_PAUSE; },
                 Keycode::F1 => { self.controls       |= 1 << CONTROL_DEBUG_COLLISION; },
@@ -404,11 +423,34 @@ impl AsteroidsEngine {
         }
 
         self.player.position += self.player.velocity * self.dt;
-        self.player.position %= RENDER_WIDTH as f32;
+        self.player.position.x %= RENDER_WIDTH as f32;
+        self.player.position.y %= RENDER_HEIGHT as f32;
     }
 
     pub fn update_asteroids(&mut self) {
+        if self.asteroids.len() <= 0 {
+            self.asteroids.push(Asteroid::spawn(&mut self.rng));
+            self.asteroids.push(Asteroid::spawn(&mut self.rng));
+            self.asteroids.push(Asteroid::spawn(&mut self.rng));
+            self.asteroids.push(Asteroid::spawn(&mut self.rng));
+        }
 
+        for i in 0..self.asteroids.len() {
+            self.asteroids[i].position += self.asteroids[i].velocity * self.dt;
+            self.asteroids[i].position.x %= RENDER_WIDTH as f32;
+            self.asteroids[i].position.y %= RENDER_HEIGHT as f32;
+
+            for bullet in &mut self.bullets {
+                if circle_overlap(bullet.position, bullet.radius, self.asteroids[i].position, self.asteroids[i].radius) {
+                    self.asteroids[i].health -= 1;
+                    if self.asteroids[i].health <= 0 {
+                        self.asteroids.remove(i);
+                    }
+                }
+            }
+        }
+
+        
     }
 
     pub fn update_bullets(&mut self) {
