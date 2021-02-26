@@ -55,7 +55,7 @@ impl Random {
 	/// The result should be as close to 0.5 as possible.
 	/// Using a counter of 0 and key index of 0 I get 0.4995544154831766
 	pub fn test_randf_average(&mut self) -> f64 {
-		let count = 400_000_000;
+		let count = 1_000_000_000;
 		let mut average: f64 = 0.0;
 		for _ in 0..count {
 			let remainder_limit: u64 = 30000000;

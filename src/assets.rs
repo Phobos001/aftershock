@@ -1,8 +1,8 @@
 extern crate lodepng;
 extern crate rgb;
+extern crate rusttype;
 
 use crate::color::*;
-
 use rgb::*;
 
 pub struct Image {
@@ -34,7 +34,7 @@ impl Image {
 				}
 			},
 			Err(reason) => {
-				println!("ERROR - IMAGE: Could not load, because: {}", reason);
+				println!("ASERROR - IMAGE: Could not load | {}", reason);
 				return Image::default();
 			}
 		};
@@ -56,8 +56,9 @@ impl Image {
 			self.buffer[idx + 1] = color.g;  // G
 			self.buffer[idx + 2] = color.b;  // B
 			self.buffer[idx + 3] = color.a;  // A
+			
 		} else {
-			println!("ERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
+			println!("ASERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
 		}
 	}
 
@@ -80,7 +81,7 @@ impl Image {
 				self.buffer[idx + 3]
 			);
 		} else {
-			println!("ERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
+			println!("ASERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
 			Color::black()
 		}
 	}
@@ -102,7 +103,7 @@ impl Font {
 		let fontimg: Image = Image::new(path_image);
 
 		if fontimg.buffer.len() <= 0 {
-			println!("ERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
+			println!("ASERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
 		}
 
 		//println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);
@@ -114,6 +115,10 @@ impl Font {
 			glyph_height,
 			glyph_spacing,
 		}
+	}
+
+	pub fn new_ttf(path_image: &str) {
+		// TODO
 	}
 }
 

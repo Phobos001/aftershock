@@ -1,5 +1,3 @@
-// Never completed this example. Sorry :(
-
 use aftershock::rasterizer::*;
 use aftershock::vectors::*;
 use aftershock::matricies::*;
@@ -32,7 +30,9 @@ pub enum VideoMode {
     Windowed,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Player {
+    pub active: bool,
     pub velocity: Vec2,
     pub position: Vec2,
     pub rotation: f32,
@@ -40,7 +40,10 @@ pub struct Player {
     pub scale: Vec2,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Asteroid {
+    pub active: bool,
+    pub id: u32,
     pub shape: [Vec2; 8],
     pub velocity: Vec2,
     pub position: Vec2,
@@ -53,6 +56,8 @@ pub struct Asteroid {
 impl Asteroid {
     pub fn new() -> Asteroid {
         Asteroid {
+            active: false,
+            id: 0,
             shape: [Vec2::zero(); 8],
             velocity: Vec2::zero(),
             position: Vec2::zero(),
@@ -75,6 +80,8 @@ impl Asteroid {
             Vec2::new(0.5, -0.5), // Top Right
         ];
 
+        // Some noise to make them look more natrual
+        // Does not effect collisions
         for p in points.iter_mut() {
             *p *= radius;
             *p += Vec2::new(rng.randf_range(-2.0, 2.0), rng.randf_range(-2.0, 2.0));
@@ -83,18 +90,13 @@ impl Asteroid {
         points
     }
 
-    pub fn spawn(rng: &mut Random) -> Asteroid {
-        let mut asteroid = Asteroid::new();
-        asteroid.radius = rng.randf_range(4.0, 16.0);
-        asteroid.shape = Asteroid::generate_shape(asteroid.radius, rng);
-        asteroid.position = Vec2::new(rng.randf_range(0.0, RENDER_WIDTH as f32), rng.randf_range(0.0, RENDER_HEIGHT as f32));
-        asteroid.rotation = rng.randf_range(0.0, 6.28);
-        asteroid.velocity = Vec2::new(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * rng.randf_range(2.0, 16.0);
-        return asteroid;
-    }
+    
 }
 
-pub struct Bullets {
+#[derive(Debug, Clone, Copy)]
+pub struct Bullet {
+    pub active: bool,
+    pub id: u32,
     pub velocity: Vec2,
     pub position: Vec2,
     pub rotation: f32,
@@ -103,9 +105,11 @@ pub struct Bullets {
     pub lifetime: f32,
 }
 
-impl Bullets {
-    pub fn new() -> Bullets {
-        Bullets {
+impl Bullet {
+    pub fn new() -> Bullet {
+        Bullet {
+            active: false,
+            id: 0,
             velocity: Vec2::zero(),
             position: Vec2::zero(),
             rotation: 0.0,
@@ -114,23 +118,23 @@ impl Bullets {
             lifetime: 0.0,
         }
     }
-
-    pub fn update(&mut self, dt: f32, idx: usize) {
-        self.position += self.velocity * dt;
-        self.position %= Vec2::new(RENDER_WIDTH as f32, RENDER_HEIGHT as f32);
-    }
 }
 
-/// If the squared distance between the two points is smaller than the combined radius's squared, then the two circles are overlapping!
+/// If the squared distance between the two points is smaller than the combined diameter's squared, then the two circles are overlapping!
 pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
+    // Double the incoming radius's so they are diameter's instead.
+    let (r1, r2) = (r1 * 2.0, r2 * 2.0);
     (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
 }
 
 pub struct AsteroidsEngine {
 
     pub player: Player,
-    pub asteroids: Vec<Asteroid>,
-    pub bullets: Vec<Bullets>,
+    pub asteroids: [Asteroid; 128],
+    pub bullets: [Bullet; 128],
+
+    pub uidx_asteroids: usize,
+    pub uidx_bullets: usize,
 
     pub rasterizer: Rasterizer,
 
@@ -162,13 +166,19 @@ impl AsteroidsEngine {
     pub fn new() -> AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
+        let rng_seedcounter = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs();
+
         AsteroidsEngine {
-            rng: Random::new(0, 0),
+            // Use time in seconds as counter seed, and use the first RNG key in the table.
+            rng: Random::new(rng_seedcounter, 0),
             rng_number: 0.0,
 
-            player: Player { velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one()},
-            asteroids: Vec::new(),
-            bullets: Vec::new(),
+            player: Player { active: true, velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one()},
+            asteroids: [Asteroid::new(); 128],
+            bullets: [Bullet::new(); 128],
+
+            uidx_asteroids: 0,
+            uidx_bullets: 0,
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
@@ -257,7 +267,7 @@ impl AsteroidsEngine {
 
         let mut printtime: f32 = 0.0;
 
-        
+
         'running: loop {
             self.update_times();
             
@@ -313,6 +323,7 @@ impl AsteroidsEngine {
             // == DRAWING ==
             self.rasterizer.cls();
             self.draw_bullets();
+            self.draw_asteroids();
             self.draw_player();
 
             if self.paused {
@@ -390,6 +401,10 @@ impl AsteroidsEngine {
         }
     }
 
+    pub fn kill_player(&mut self) {
+
+    }
+
     pub fn update_player(&mut self) {
         if self.is_control_down(CONTROL_ROTATE_LEFT) {
             self.player.rotation += self.dt * 3.0;
@@ -419,42 +434,84 @@ impl AsteroidsEngine {
             let direction = Mat3::rotated(self.player.rotation).forward(Vec2::right());
             let offset = Mat3::translated(self.player.position).forward(direction * 16.0);
             
-            //self.bullets.spawn(offset, direction * 128.0, 0.0, 2.0, Vec2::one());
+            self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
         }
 
         self.player.position += self.player.velocity * self.dt;
-        self.player.position.x %= RENDER_WIDTH as f32;
-        self.player.position.y %= RENDER_HEIGHT as f32;
+        self.player.position.x = modf(self.player.position.x, RENDER_WIDTH as f32);
+        self.player.position.y = modf(self.player.position.y, RENDER_HEIGHT as f32);
+    }
+
+    pub fn spawn_bullet(&mut self, offset: Vec2, direction: Vec2, force: f32) {
+        let mut bullet = &mut self.bullets[self.uidx_bullets % self.bullets.len()];
+
+        bullet.position = offset;
+        bullet.velocity = direction * force;
+        bullet.radius = 2.0;
+        bullet.scale = Vec2::one();
+        bullet.rotation = 0.0; // Really if the bullets don't end up being dots this would be useful, otherwise not really.
+        bullet.active = true;
+
+        self.uidx_bullets += 1;
+        
+        
+    }
+
+    pub fn spawn_asteroid(&mut self) {
+        let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
+
+        asteroid.radius = self.rng.randf_range(4.0, 16.0);
+        asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
+        asteroid.position = Vec2::new(self.rng.randf_range(0.0, RENDER_WIDTH as f32), self.rng.randf_range(0.0, RENDER_HEIGHT as f32));
+        asteroid.rotation = self.rng.randf_range(0.0, 6.28);
+        asteroid.velocity = Vec2::new(self.rng.randf_range(-1.0, 1.0), self.rng.randf_range(-1.0, 1.0)) * self.rng.randf_range(2.0, 64.0);
+        asteroid.active = true;
+
+        self.uidx_asteroids += 1;
     }
 
     pub fn update_asteroids(&mut self) {
-        if self.asteroids.len() <= 0 {
-            self.asteroids.push(Asteroid::spawn(&mut self.rng));
-            self.asteroids.push(Asteroid::spawn(&mut self.rng));
-            self.asteroids.push(Asteroid::spawn(&mut self.rng));
-            self.asteroids.push(Asteroid::spawn(&mut self.rng));
-        }
 
-        for i in 0..self.asteroids.len() {
-            self.asteroids[i].position += self.asteroids[i].velocity * self.dt;
-            self.asteroids[i].position.x %= RENDER_WIDTH as f32;
-            self.asteroids[i].position.y %= RENDER_HEIGHT as f32;
+        // Update active asteroids. Also keep track of how many are active.
+        let mut asteroids_active: u32 = 0;
+        for asteroid in &mut self.asteroids {
+            if asteroid.active { 
+                asteroids_active += 1;
 
-            for bullet in &mut self.bullets {
-                if circle_overlap(bullet.position, bullet.radius, self.asteroids[i].position, self.asteroids[i].radius) {
-                    self.asteroids[i].health -= 1;
-                    if self.asteroids[i].health <= 0 {
-                        self.asteroids.remove(i);
+                asteroid.position += asteroid.velocity * self.dt;
+                asteroid.position.x = modf(asteroid.position.x, RENDER_WIDTH as f32);
+                asteroid.position.y = modf(asteroid.position.y, RENDER_HEIGHT as f32);
+
+                
+
+                for bullet in &mut self.bullets {
+                    if circle_overlap(bullet.position, bullet.radius, asteroid.position, asteroid.radius) {
+                        asteroid.health -= 1;
+                        if asteroid.health <= 0 {
+                            asteroid.active = false;
+                            bullet.active = false;
+                        }
                     }
                 }
             }
         }
 
-        
+        if asteroids_active <= 0 {
+            for _ in 0..8 {
+                self.spawn_asteroid();
+            }
+        }
     }
 
     pub fn update_bullets(&mut self) {
 
+        for bullet in &mut self.bullets {
+            if bullet.active {
+                bullet.position += bullet.velocity * self.dt;
+                bullet.position.x = modf(bullet.position.x, RENDER_WIDTH as f32);
+                bullet.position.y = modf(bullet.position.y, RENDER_WIDTH as f32);
+            }
+        }
     }
 
     pub fn draw_player(&mut self) {
@@ -491,11 +548,48 @@ impl AsteroidsEngine {
     }
 
     pub fn draw_asteroids(&mut self) {
+        for asteroid in &self.asteroids {
+            if asteroid.active {
+                // Prepare a transformation chain to get our final transformation matrix
+                let translated: Mat3 = Mat3::translated(asteroid.position);
+                let rotated: Mat3 = Mat3::rotated(asteroid.rotation);
+                let scaled: Mat3 = Mat3::scaled(asteroid.scale);
 
+                // Transformations are done in the order of right to left
+                let mtx = translated * rotated * scaled;
+
+                // Transform points into world space
+                let mtx_line0 = mtx.forward(asteroid.shape[0]);
+                let mtx_line1 = mtx.forward(asteroid.shape[1]);
+                let mtx_line2 = mtx.forward(asteroid.shape[2]);
+                let mtx_line3 = mtx.forward(asteroid.shape[3]);
+                let mtx_line4 = mtx.forward(asteroid.shape[4]);
+                let mtx_line5 = mtx.forward(asteroid.shape[5]);
+                let mtx_line6 = mtx.forward(asteroid.shape[6]);
+                let mtx_line7 = mtx.forward(asteroid.shape[7]);
+
+                // Draw lines to rasterizer with wrapping
+                self.rasterizer.wrapping = true;
+                self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
+                self.rasterizer.wrapping = false;
+            }
+            
+        }
     }
 
     pub fn draw_bullets(&mut self) {
-        
+        for bullet in &self.bullets {
+            if bullet.active {
+                self.rasterizer.pcircle(true, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::white());
+            }   
+        }
     }
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
@@ -509,6 +603,18 @@ impl AsteroidsEngine {
 
     pub fn draw_debug_collision(&mut self) {
         self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::green());
+
+        for asteroid in &self.asteroids {
+            if asteroid.active {
+                self.rasterizer.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::green());
+            }
+        }
+
+        for bullet in &self.bullets {
+            if bullet.active {
+                self.rasterizer.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::green());
+            }
+        }
     }
 
     pub fn update_times(&mut self) {
@@ -542,6 +648,9 @@ pub fn main() {
             _ => {}
         }
     }
+
+    //let uniformity = engine.rng.test_randf_average();
+    //println!("Uniformity with 1 billion numbers: {}", uniformity);
 
     let _error_code = engine.run(hardware_accelerated);
 }

@@ -149,6 +149,22 @@ impl TemplateEngine {
 
             let mouse_state = event_pump.mouse_state();
 
+            // Mouse Updating
+            let display_mode = video_subsystem.current_display_mode(0).unwrap();
+            let (window_width, window_height) = canvas.window().size();
+            let screen_width = display_mode.w as f32;
+            let screen_height = display_mode.h as f32;
+
+            mouse_x = mouse_state.x() as f32;
+            mouse_y = mouse_state.y() as f32;
+
+            let mouse_scalar_x = RENDER_WIDTH as f32 / window_width as f32;
+            let mouse_scalar_y = RENDER_HEIGHT as f32 / window_height as f32;
+
+            mouse_x *= mouse_scalar_x;
+            mouse_y *= mouse_scalar_y;
+
+            // Print FPS and DT info
             printtime += self.dt_unscaled;
             if printtime > 1.0 {
                 self.fps_print = self.fps;
@@ -156,7 +172,7 @@ impl TemplateEngine {
                 printtime = 0.0;
             }
 
-            
+            // == GRAPHICS ==
             self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
 
             // High level spritefont example
@@ -165,20 +181,11 @@ impl TemplateEngine {
             spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
             spritefont_test.draw(&mut self.rasterizer);
 
-            // Mouse Updating
-            let display_mode = video_subsystem.current_display_mode(0).unwrap();
-            let (window_width, window_height) = canvas.window().size();
-            let screen_width = display_mode.w as f32;
-            let screen_height = display_mode.h as f32;
-            mouse_x = mouse_state.x() as f32;
-            mouse_y = mouse_state.y() as f32;
-
-            mouse_x *= window_width as f32 / screen_width;
-            mouse_y *= window_height as f32 / screen_height;
-
+            
+            // Image Drawing
             self.rasterizer.pimg(&scotty, mouse_x as i32, mouse_y as i32);
 
-            // Image drawing but T R A N S P A R E N T
+            // Image Drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);
             self.rasterizer.opacity = 128;
             self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
