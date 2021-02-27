@@ -702,7 +702,7 @@ impl AsteroidsEngine {
 
                 for j in 0..self.bullets.len() {
                     let bullet = &mut self.bullets[j];
-                    if circle_overlap(bullet.position, bullet.radius, self.asteroids[i].position, self.asteroids[i].radius) {
+                    if bullet.active && circle_overlap(bullet.position, bullet.radius, self.asteroids[i].position, self.asteroids[i].radius) {
                         self.asteroids[i].health -= 1;
                         if self.asteroids[i].health <= 0 {
                             self.asteroids[i].active = false;
