@@ -1,10 +1,10 @@
 extern crate lodepng;
 extern crate rgb;
-extern crate rusttype;
 
 use crate::color::*;
 use rgb::*;
 
+/// Uncompressed bitmap image, typically loaded from PNG files.
 pub struct Image {
 	pub buffer: Vec<u8>,
 	pub width: usize,
@@ -21,6 +21,7 @@ impl Image {
 		}
 	}
 
+	/// Create a new image and load from disk. Only supports PNG files.
 	pub fn new(path_to: &str) -> Image {
 		match lodepng::decode32_file(path_to) {
 			Ok(image) => {
@@ -40,6 +41,7 @@ impl Image {
 		};
 	}
 
+	/// Change a pixel color in the image.
 	pub fn pset(&mut self, x: i32, y: i32, color: Color) {
 		if self.buffer.len() > 0 {
 			let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
@@ -62,6 +64,7 @@ impl Image {
 		}
 	}
 
+	/// Get a pixel color from the image.
 	pub fn pget(&self, x: i32, y: i32) -> Color {
 		if self.buffer.len() > 0 {
 			let idx: usize = (y * (self.width as i32) + x) as usize * 4;
@@ -87,6 +90,14 @@ impl Image {
 	}
 }
 
+/// Bitmap font for drawing simple text. To be used with the Rasterizers pprint function.
+/// All bitmap fonts need a glyph index that's in order of left-to-right, top-to-bottom of the glyphs used
+/// in the font image. The glyph index is used as a lookup table to find the corrisponding glyph subimage.
+///
+/// For example, a simple five glyph image in the order of 'N', 'O', 'W', 'A', 'Y' must have a glyphidx
+/// of "NOWAY" for it to print your text correctly.
+/// 
+/// The glyph width and height tells the font how big the sections are for the glyphs in the image.
 pub struct Font {
 	pub glyphidx: Vec<char>,
 	pub fontimg: Image,
@@ -97,6 +108,8 @@ pub struct Font {
 
 
 impl Font {
+
+	/// Load a font image from disk. The order
 	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i32) -> Font {
 
 		let glyphidx = glyphidxstr.to_string().chars().collect();
@@ -117,28 +130,8 @@ impl Font {
 		}
 	}
 
+	/// rusttype will be implemented here eventually. for now this does nothing.
 	pub fn new_ttf(path_image: &str) {
 		// TODO
-	}
-}
-
-pub struct FontGlyph {
-	pub glyphstr: char,
-	pub rectx: u32,
-	pub recty: u32,
-	pub rectw: u32,
-	pub recth: u32
-}
-
-impl FontGlyph {
-	pub fn default() -> FontGlyph {
-		FontGlyph {
-			glyphstr: 'a',
-			rectx: 0,
-			recty: 0,
-			rectw: 0,
-			recth: 0,
-		}
-		
 	}
 }

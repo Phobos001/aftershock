@@ -7,6 +7,9 @@ pub struct Mat3 {
 }
 
 impl Mat3 {
+
+	/// Returns an identity matrix. It's basically like a normalized vector, where the 'magnitudes' of each value are 1.0.
+	/// This is usually the foundation of all matrix transformations.
 	pub fn identity() -> Mat3 {
 		Mat3 {
 			m: [

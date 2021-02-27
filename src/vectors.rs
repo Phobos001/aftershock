@@ -22,18 +22,22 @@ impl Vec2 {
 	pub fn left() -> Vec2 { Vec2 { x: -1.0, y: 0.0, } }
 	pub fn right() -> Vec2 { Vec2 {x: 1.0, y: 0.0, } }
 
+	/// Gets the width/height ratio of the vector as a 32-bit float.
 	pub fn ratio(&self) -> f32 {
 		self.x / self.y
 	}
 
+	/// Returns the squared magnitude of the vector.
 	pub fn magnitude_sqr(&self) -> f32 {
 		(self.x * self.x) + (self.y * self.y)
 	}
 
+	/// Returns the real magnitude of the vector.
 	pub fn magnitude(&self) -> f32 {
 		((self.x * self.x) + (self.y * self.y)).sqrt()
 	}
 
+	/// Sets the vectors magintude to 1.0 while retaining its direction.
 	pub fn normalize(&mut self) {
 		let mut magnitude = self.magnitude_sqr();
 		if magnitude > 0.0 {
@@ -47,19 +51,27 @@ impl Vec2 {
 		}
 	}
 
+	/// Returns a normalized copy of the vector.
 	pub fn normalized(&self) -> Vec2 {
 		let mut normalized_vec = self.clone();
 		normalized_vec.normalize();
 		normalized_vec
 	}
 
+	/// Returns the dot product of two 2D vectors.
 	pub fn dot(v1: Vec2, v2: Vec2) -> f32 {
 		v1.x * v2.x + v1.y * v2.y
 	}
 
+	///Returns the cross product of two 2D vectors.
+	/// You cant really do cross products with 2D vectors but if we pretend its 3D we can still get some use out of the result
 	pub fn cross(v1: Vec2, v2: Vec2) -> f32 {
-		// You cant really do cross products with 2D vectors but if we pretend its 3D we can still get some use out of the result
 		v1.x * v2.y - v1.y * v2.x
+	}
+
+	/// Returns the 2D distance between two points.
+	pub fn distance(v1: Vec2, v2: Vec2) -> f32{
+		((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
 	}
 
 	pub fn perpendicular_clockwise(&self) -> Vec2 {

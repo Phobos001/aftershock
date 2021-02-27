@@ -1,6 +1,7 @@
 use crate::all::*;
 
 /// Matrix-Transformed image drawing.
+/// Allows for scaling, rotation, positioning, and shearing.
 pub struct Sprite<'a> {
     pub tint: Color,
     pub opacity: u8,
@@ -9,6 +10,7 @@ pub struct Sprite<'a> {
 	pub position: Vec2,
 	pub rotation: f32,
 	pub scale: Vec2,
+    pub shear: Vec2,
 }
 
 impl<'a> Sprite<'a> {
@@ -21,6 +23,7 @@ impl<'a> Sprite<'a> {
 			position: Vec2::new(x, y),
 			rotation: a,
 			scale: Vec2::new(sx, sy),
+            shear: Vec2::one(),
 		}
 	}
 
@@ -39,6 +42,7 @@ pub struct SpriteFontGlyph {
 }
 
 /// Sprite-based font which offers more flexibility for drawing than the standard Font.
+/// Currently not feature complete.
 pub struct SpriteFont {
     pub glyphs: Vec<SpriteFontGlyph>,
     pub glyphidx: Vec<char>,

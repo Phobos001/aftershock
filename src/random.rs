@@ -20,7 +20,8 @@ impl Random {
 		}
 	}
 
-	// Returns a random 64-bit unsigned integer
+	/// Returns a random 64-bit unsigned integer
+	/// The random number does NOT reach the max bounds of the u64 type.
 	fn rand(&mut self) -> u64 {
 		let mut x: u64 = self.counter * KEYS_TABLE[self.key];
 		let y: u64 = x;
@@ -43,10 +44,12 @@ impl Random {
 		return (rand as f64 / remainder_limit as f64) as f32;
 	}
 
+	/// Returns a random 32-bit float between min and max.
 	pub fn randf_range(&mut self, min: f32, max: f32) -> f32 {
 		lerpf(min, max, self.randf_linear01())
 	}
 
+	/// Returns a random 32-bit integer between min and max.
 	pub fn randi_range(&mut self, min: i32, max: i32) -> i32 {
 		lerpi(min, max, self.randf_linear01())
 	}
