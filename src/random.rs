@@ -21,7 +21,7 @@ impl Random {
 	}
 
 	/// Returns a random 64-bit unsigned integer
-	/// The random number does NOT reach the max bounds of the u64 type.
+	/// The output is uniform and will eventually produce all 2^64 numbers with the key.
 	fn rand(&mut self) -> u64 {
 		let mut x: u64 = self.counter * KEYS_TABLE[self.key];
 		let y: u64 = x;

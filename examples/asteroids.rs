@@ -347,10 +347,9 @@ impl AsteroidsEngine {
                 self.update_explosion_particles();
                 self.update_camera();
             }
-            
-            
 
             // == DRAWING ==
+
             // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
             canvas.clear();
 
