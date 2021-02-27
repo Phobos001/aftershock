@@ -1,3 +1,5 @@
+// ECS would be perfect for this but I'm trying to keep things simple.
+
 use aftershock::rasterizer::*;
 use aftershock::vectors::*;
 use aftershock::matricies::*;
@@ -6,7 +8,7 @@ use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::random::*;
 
-use std::time::Instant;
+use std::{thread::spawn, time::Instant};
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -41,9 +43,33 @@ pub struct Player {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Bullet {
+    pub active: bool,
+    pub velocity: Vec2,
+    pub position: Vec2,
+    pub rotation: f32,
+    pub radius: f32,
+    pub scale: Vec2,
+    pub lifetime: f32,
+}
+
+impl Bullet {
+    pub fn new() -> Bullet {
+        Bullet {
+            active: false,
+            velocity: Vec2::zero(),
+            position: Vec2::zero(),
+            rotation: 0.0,
+            radius: 0.0,
+            scale: Vec2::one(),
+            lifetime: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Asteroid {
     pub active: bool,
-    pub id: u32,
     pub shape: [Vec2; 8],
     pub velocity: Vec2,
     pub position: Vec2,
@@ -57,7 +83,6 @@ impl Asteroid {
     pub fn new() -> Asteroid {
         Asteroid {
             active: false,
-            id: 0,
             shape: [Vec2::zero(); 8],
             velocity: Vec2::zero(),
             position: Vec2::zero(),
@@ -88,34 +113,22 @@ impl Asteroid {
         }
 
         points
-    }
-
-    
+    }   
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Bullet {
-    pub active: bool,
-    pub id: u32,
-    pub velocity: Vec2,
+pub struct ExplosionParticle {
     pub position: Vec2,
-    pub rotation: f32,
+    pub velocity: Vec2,
     pub radius: f32,
-    pub scale: Vec2,
-    pub lifetime: f32,
 }
 
-impl Bullet {
-    pub fn new() -> Bullet {
-        Bullet {
-            active: false,
-            id: 0,
-            velocity: Vec2::zero(),
+impl ExplosionParticle {
+    pub fn new() -> ExplosionParticle {
+        ExplosionParticle {
             position: Vec2::zero(),
-            rotation: 0.0,
+            velocity: Vec2::zero(),
             radius: 0.0,
-            scale: Vec2::one(),
-            lifetime: 0.0,
         }
     }
 }
@@ -128,10 +141,16 @@ pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
 }
 
 pub struct AsteroidsEngine {
+    pub camera: Mat3,
+    pub camera_boomzoom: f32,
 
     pub player: Player,
     pub asteroids: [Asteroid; 128],
     pub bullets: [Bullet; 128],
+
+    pub explosion_particles: [ExplosionParticle; 8192],
+
+    pub score: i32,
 
     pub uidx_asteroids: usize,
     pub uidx_bullets: usize,
@@ -147,6 +166,8 @@ pub struct AsteroidsEngine {
 
     pub rng: Random,
     pub rng_number: f32,
+
+    pub sf_score: SpriteFont,
 
     pub debug_collision: bool,
     pub debug_info: bool,
@@ -167,15 +188,24 @@ impl AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
         let rng_seedcounter = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs();
+        let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 
         AsteroidsEngine {
+            camera: Mat3::identity(),
+            camera_boomzoom: 0.0,
+
             // Use time in seconds as counter seed, and use the first RNG key in the table.
             rng: Random::new(rng_seedcounter, 0),
             rng_number: 0.0,
 
-            player: Player { active: true, velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 8.0, scale: Vec2::one()},
+            player: Player { active: true, velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vec2::one()},
             asteroids: [Asteroid::new(); 128],
             bullets: [Bullet::new(); 128],
+
+            explosion_particles: [ExplosionParticle::new(); 8192],
+
+            score: 0,
+            sf_score: SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0),
 
             uidx_asteroids: 0,
             uidx_bullets: 0,
@@ -264,9 +294,9 @@ impl AsteroidsEngine {
 
 		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
+    
 
         let mut printtime: f32 = 0.0;
-
 
         'running: loop {
             self.update_times();
@@ -288,8 +318,8 @@ impl AsteroidsEngine {
                 self.rng_number = self.rng.randf_linear01();
             }
 
-            // == CONTROLS ==
             self.update_controls(&event_pump);
+            
 
             if self.is_control_pressed(CONTROL_PAUSE) {
                 self.paused = !self.paused;
@@ -300,28 +330,37 @@ impl AsteroidsEngine {
                 }
             }
 
-            if self.is_control_pressed(CONTROL_DEBUG_INFO) {
-                self.debug_info = !self.debug_info;
-            }
-
             if self.is_control_pressed(CONTROL_DEBUG_COLLISION) {
                 self.debug_collision = !self.debug_collision;
             }
 
+            if self.is_control_pressed(CONTROL_DEBUG_INFO) {
+                self.debug_info = !self.debug_info;
+            }
+
             // == UPDATING ==
-            // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
-            canvas.clear();
-            
             
             if !self.paused {
-                // Player
                 self.update_player();
                 self.update_asteroids();
                 self.update_bullets();
+                self.update_explosion_particles();
+                self.update_camera();
             }
+            
+            
 
             // == DRAWING ==
+            // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
+            canvas.clear();
+
             self.rasterizer.cls();
+
+
+
+            self.draw_explosion_particles();
+
+            self.draw_score();
             self.draw_bullets();
             self.draw_asteroids();
             self.draw_player();
@@ -355,6 +394,7 @@ impl AsteroidsEngine {
             self.tics += 1;
             self.fps += 1;
 
+            // Give the processor a break
             std::thread::sleep(std::time::Duration::from_micros(1));
         }
 
@@ -401,46 +441,191 @@ impl AsteroidsEngine {
         }
     }
 
-    pub fn kill_player(&mut self) {
+    ///// ====== PLAYER ====== /////
 
+    pub fn kill_player(&mut self) {
+        self.player.active = false;
     }
 
     pub fn update_player(&mut self) {
-        if self.is_control_down(CONTROL_ROTATE_LEFT) {
-            self.player.rotation += self.dt * 3.0;
+        if self.player.active {
+            if self.is_control_down(CONTROL_ROTATE_LEFT) {
+                self.player.rotation += self.dt * 3.0;
+            }
+    
+            if self.is_control_down(CONTROL_ROTATE_RIGHT) {
+                self.player.rotation -= self.dt * 3.0;
+            }
+    
+            if self.is_control_down(CONTROL_THRUST_FORWARD) {
+                let direction = Mat3::rotated(self.player.rotation);
+    
+                // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
+                // Also we assume right is the starting rotation direction because of how we draw the player
+                self.player.velocity += direction.forward(Vec2::right() * 64.0) * self.dt;
+            }
+    
+            if self.is_control_down(CONTROL_THRUST_BACKWARD) {
+                let direction = Mat3::rotated(self.player.rotation);
+    
+                // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
+                // Also we assume right is the starting rotation direction because of how we draw the player
+                self.player.velocity -= direction.forward(Vec2::right() * 64.0) * self.dt;
+            }
+    
+            if self.is_control_pressed(CONTROL_FIRE) {
+                let direction = Mat3::rotated(self.player.rotation).forward(Vec2::right());
+                let offset = Mat3::translated(self.player.position).forward(direction * 16.0);
+                
+                self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
+            }
+    
+            self.player.position += self.player.velocity * self.dt;
+            self.player.position.x = modf(self.player.position.x, RENDER_WIDTH as f32);
+            self.player.position.y = modf(self.player.position.y, RENDER_HEIGHT as f32);
+
+            // Check if we are touching any asteroids or bullets. Escape if player is already dead
+            for i in 0..self.asteroids.len() {
+                if self.player.active && self.asteroids[i].active {
+                    if circle_overlap(self.player.position, self.player.radius, self.asteroids[i].position, self.asteroids[i].radius) {
+                        self.kill_player();
+                        break;
+                    }
+                }
+            }
+
+            for i in 0..self.bullets.len() {
+                if self.player.active && self.bullets[i].active {
+                    if circle_overlap(self.player.position, self.player.radius, self.bullets[i].position, self.bullets[i].radius) {
+                        self.kill_player();
+                        self.bullets[i].active = false;
+                        break;
+                    }
+                }
+            }
+        } else {
+            if self.is_control_pressed(CONTROL_FIRE) {
+                self.restart_game();
+            }
         }
-
-        if self.is_control_down(CONTROL_ROTATE_RIGHT) {
-            self.player.rotation -= self.dt * 3.0;
-        }
-
-        if self.is_control_down(CONTROL_THRUST_FORWARD) {
-            let direction = Mat3::rotated(self.player.rotation);
-
-            // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
-            // Also we assume right is the starting rotation direction because of how we draw the player
-            self.player.velocity += direction.forward(Vec2::right() * 64.0) * self.dt;
-        }
-
-        if self.is_control_down(CONTROL_THRUST_BACKWARD) {
-            let direction = Mat3::rotated(self.player.rotation);
-
-            // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
-            // Also we assume right is the starting rotation direction because of how we draw the player
-            self.player.velocity -= direction.forward(Vec2::right() * 64.0) * self.dt;
-        }
-
-        if self.is_control_pressed(CONTROL_FIRE) {
-            let direction = Mat3::rotated(self.player.rotation).forward(Vec2::right());
-            let offset = Mat3::translated(self.player.position).forward(direction * 16.0);
-            
-            self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
-        }
-
-        self.player.position += self.player.velocity * self.dt;
-        self.player.position.x = modf(self.player.position.x, RENDER_WIDTH as f32);
-        self.player.position.y = modf(self.player.position.y, RENDER_HEIGHT as f32);
+        
     }
+
+    pub fn draw_player(&mut self) {
+        // Prepare a transformation chain to get our final transformation matrix
+        let translated: Mat3 = Mat3::translated(self.player.position);
+        let rotated: Mat3 = Mat3::rotated(self.player.rotation);
+        let scaled: Mat3 = Mat3::scaled(self.player.scale);
+
+        // Transformations are done in the order of right to left
+        let mtx = self.camera * translated * rotated * scaled;
+
+        // Defines an arrow looking thing to represent the player
+        let player_points = [
+            Vec2::new(8.0, 0.0),
+            Vec2::new(-8.0, 8.0),
+            Vec2::new(-5.0, 0.0),
+            Vec2::new(-8.0, -8.0),
+        ];
+
+        // Transform points into world space
+        let mtx_line0 = mtx.forward(player_points[0]);
+        let mtx_line1 = mtx.forward(player_points[1]);
+        let mtx_line2 = mtx.forward(player_points[2]);
+        let mtx_line3 = mtx.forward(player_points[3]);
+
+        // Draw lines to rasterizer with wrapping
+
+        let player_color: Color = {
+            if self.player.active {
+                Color::white()
+            } else {
+                Color::red()
+            }
+        };
+
+        self.rasterizer.wrapping = true;
+        self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, player_color);
+        self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, player_color);
+        self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, player_color);
+        self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, player_color);
+        self.rasterizer.wrapping = false;
+    }
+
+    ///// ====== PLAYER ====== /////
+
+    ///// ====== EFFECTS ====== /////
+
+    pub fn spawn_explosion(&mut self, position: Vec2) {
+        let mut spawn_counter = 32;
+        for i in 0..self.explosion_particles.len() {
+            if spawn_counter > 0 {
+                if self.explosion_particles[i].radius <= 0.1 {
+                    self.explosion_particles[i].radius = self.rng.randf_range(4.0, 16.0);
+                    self.explosion_particles[i].position = position;
+                    self.explosion_particles[i].velocity = Vec2::new(
+                        self.rng.randf_range(-1.0, 1.0),
+                        self.rng.randf_range(-1.0, 1.0)
+                    ) * self.rng.randf_range(8.0, 256.0);
+                    spawn_counter -= 1;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn update_explosion_particles(&mut self) {
+        for i in 0..self.explosion_particles.len() {
+            if self.explosion_particles[i].radius > 0.1 {
+                self.explosion_particles[i].position += self.explosion_particles[i].velocity * self.dt;
+                self.explosion_particles[i].radius = lerpf(self.explosion_particles[i].radius, 0.0, 0.5 * self.dt);
+                self.explosion_particles[i].velocity = Vec2::lerp(self.explosion_particles[i].velocity, Vec2::up(), 1.0 * self.dt);
+            }
+            
+        }
+    }
+
+    pub fn draw_explosion_particles(&mut self) {
+        for i in 0..self.explosion_particles.len() {
+            if self.explosion_particles[i].radius > 0.1 {
+                let mtx_position = self.camera.forward(self.explosion_particles[i].position);
+                self.rasterizer.pcircle(false, 
+                    mtx_position.x as i32,
+                    mtx_position.y as i32,
+                    (self.explosion_particles[i].radius * self.camera_boomzoom) as i32, Color::hsv(0.1, 1.0, self.explosion_particles[i].radius / 8.0)
+                );
+            }
+        }
+    }
+
+    ///// ====== EFFECTS ====== /////
+
+    ///// ====== CAMERA ====== /////
+
+    pub fn update_camera(&mut self) {
+        self.camera_boomzoom = lerpf(self.camera_boomzoom, 1.0, 5.0 * self.dt);
+        let camera_scaled = Mat3::scaled(Vec2::one() * self.camera_boomzoom);
+        // We need to move the camera closer to the center based on zoom since it's technically in the top-left corner
+        let camera_translated = Mat3::translated(
+            Vec2::new(
+                lerpf(RENDER_WIDTH as f32 / 2.0, 0.0, self.camera_boomzoom), 
+                lerpf(RENDER_HEIGHT as f32 / 2.0, 0.0, self.camera_boomzoom)
+            ));
+
+        self.camera = camera_scaled * camera_translated;
+    }
+    
+    pub fn camera_impact_effect(&mut self) {
+        self.camera_boomzoom = 1.0333;
+    }
+
+    ///// ====== CAMERA ====== /////
+
+
+
+
+    ///// ====== BULLET ====== /////
 
     pub fn spawn_bullet(&mut self, offset: Vec2, direction: Vec2, force: f32) {
         let mut bullet = &mut self.bullets[self.uidx_bullets % self.bullets.len()];
@@ -450,12 +635,43 @@ impl AsteroidsEngine {
         bullet.radius = 2.0;
         bullet.scale = Vec2::one();
         bullet.rotation = 0.0; // Really if the bullets don't end up being dots this would be useful, otherwise not really.
-        bullet.active = true;
+        bullet.active = true;    // Kinda expensive to do it this way but it's simple
 
         self.uidx_bullets += 1;
         
-        
+        self.remove_score(5);
     }
+
+    pub fn update_bullets(&mut self) {
+
+        for i in 0..self.bullets.len() {
+            if self.bullets[i].active {
+                self.bullets[i].position += self.bullets[i].velocity * self.dt;
+                self.bullets[i].position.x = modf(self.bullets[i].position.x, RENDER_WIDTH as f32);
+                self.bullets[i].position.y = modf(self.bullets[i].position.y, RENDER_WIDTH as f32);
+                self.bullets[i].lifetime += self.dt;
+                if self.bullets[i].lifetime > 5.0 {
+                    self.bullets[i].active = false;
+                }
+            }
+        }
+    }
+
+    pub fn draw_bullets(&mut self) {
+        for bullet in &self.bullets {
+            if bullet.active {
+                let mtx_position = self.camera.forward(bullet.position);
+                self.rasterizer.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::white());
+            }   
+        }
+    }
+
+    ///// ====== BULLET ====== /////
+
+
+
+
+    ///// ====== ASTEROID ====== /////
 
     pub fn spawn_asteroid(&mut self) {
         let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
@@ -474,26 +690,31 @@ impl AsteroidsEngine {
 
         // Update active asteroids. Also keep track of how many are active.
         let mut asteroids_active: u32 = 0;
-        for asteroid in &mut self.asteroids {
-            if asteroid.active { 
+        for i in 0..self.asteroids.len() {
+            if self.asteroids[i].active { 
                 asteroids_active += 1;
 
-                asteroid.position += asteroid.velocity * self.dt;
-                asteroid.position.x = modf(asteroid.position.x, RENDER_WIDTH as f32);
-                asteroid.position.y = modf(asteroid.position.y, RENDER_HEIGHT as f32);
+                self.asteroids[i].position += self.asteroids[i].velocity * self.dt;
+                self.asteroids[i].position.x = modf(self.asteroids[i].position.x, RENDER_WIDTH as f32);
+                self.asteroids[i].position.y = modf(self.asteroids[i].position.y, RENDER_HEIGHT as f32);
 
                 
 
-                for bullet in &mut self.bullets {
-                    if circle_overlap(bullet.position, bullet.radius, asteroid.position, asteroid.radius) {
-                        asteroid.health -= 1;
-                        if asteroid.health <= 0 {
-                            asteroid.active = false;
+                for j in 0..self.bullets.len() {
+                    let bullet = &mut self.bullets[j];
+                    if circle_overlap(bullet.position, bullet.radius, self.asteroids[i].position, self.asteroids[i].radius) {
+                        self.asteroids[i].health -= 1;
+                        if self.asteroids[i].health <= 0 {
+                            self.asteroids[i].active = false;
                             bullet.active = false;
+                            self.camera_impact_effect();
+                            self.spawn_explosion(self.asteroids[i].position);
+
+                            self.add_score(25);
                         }
                     }
                 }
-            }
+            }        
         }
 
         if asteroids_active <= 0 {
@@ -501,50 +722,6 @@ impl AsteroidsEngine {
                 self.spawn_asteroid();
             }
         }
-    }
-
-    pub fn update_bullets(&mut self) {
-
-        for bullet in &mut self.bullets {
-            if bullet.active {
-                bullet.position += bullet.velocity * self.dt;
-                bullet.position.x = modf(bullet.position.x, RENDER_WIDTH as f32);
-                bullet.position.y = modf(bullet.position.y, RENDER_WIDTH as f32);
-            }
-        }
-    }
-
-    pub fn draw_player(&mut self) {
-        
-        // Prepare a transformation chain to get our final transformation matrix
-        let translated: Mat3 = Mat3::translated(self.player.position);
-        let rotated: Mat3 = Mat3::rotated(self.player.rotation);
-        let scaled: Mat3 = Mat3::scaled(self.player.scale);
-
-        // Transformations are done in the order of right to left
-        let mtx = translated * rotated * scaled;
-
-        // Defines an arrow looking thing to represent the player
-        let player_points = [
-            Vec2::new(8.0, 0.0),
-            Vec2::new(-8.0, 8.0),
-            Vec2::new(-5.0, 0.0),
-            Vec2::new(-8.0, -8.0),
-        ];
-
-        // Transform points into world space
-        let mtx_line0 = mtx.forward(player_points[0]);
-        let mtx_line1 = mtx.forward(player_points[1]);
-        let mtx_line2 = mtx.forward(player_points[2]);
-        let mtx_line3 = mtx.forward(player_points[3]);
-
-        // Draw lines to rasterizer with wrapping
-        self.rasterizer.wrapping = true;
-        self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
-        self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
-        self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
-        self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
-        self.rasterizer.wrapping = false;
     }
 
     pub fn draw_asteroids(&mut self) {
@@ -556,7 +733,7 @@ impl AsteroidsEngine {
                 let scaled: Mat3 = Mat3::scaled(asteroid.scale);
 
                 // Transformations are done in the order of right to left
-                let mtx = translated * rotated * scaled;
+                let mtx = self.camera * translated * rotated * scaled;
 
                 // Transform points into world space
                 let mtx_line0 = mtx.forward(asteroid.shape[0]);
@@ -584,12 +761,32 @@ impl AsteroidsEngine {
         }
     }
 
-    pub fn draw_bullets(&mut self) {
-        for bullet in &self.bullets {
-            if bullet.active {
-                self.rasterizer.pcircle(true, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::white());
-            }   
+    ///// ====== ASTEROID ====== /////
+
+    
+
+
+    ///// ====== ENGINE ====== /////
+
+    pub fn add_score(&mut self, score: i32) {
+        self.score += score;
+        self.sf_score.opacity = 255;
+    }
+
+    pub fn remove_score(&mut self, score: i32) {
+        self.score -= score;
+        if self.score < 0 {
+            self.score = 0;
         }
+    }
+
+    pub fn draw_score(&mut self) {
+        self.sf_score.text = format!("{:0>8}", self.score);
+        self.sf_score.scale = Vec2::new(10.0, 10.0);
+        self.sf_score.spacing_horizontal = 64.0;
+        self.sf_score.opacity = if self.sf_score.opacity > 32 { self.sf_score.opacity - 1} else { 32 };
+        self.sf_score.position = Vec2::new(8.0, 450.0);
+        self.sf_score.draw(&mut self.rasterizer);
     }
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
@@ -631,6 +828,28 @@ impl AsteroidsEngine {
         self.realtime += self.dt_unscaled;
     }
 
+    pub fn restart_game(&mut self) {
+        self.player.active = true;
+        self.player.position = Vec2::new(RENDER_WIDTH as f32 / 2.0, RENDER_HEIGHT as f32 / 2.0);
+        self.player.velocity = Vec2::zero();
+        self.player.rotation = 0.0;
+
+        for asteroid in &mut self.asteroids {
+            asteroid.active = false;
+        }
+
+        for bullet in &mut self.bullets {
+            bullet.active = false;
+        }
+
+        for particle in &mut self.explosion_particles {
+            particle.radius = 0.0;
+        }
+
+        self.score = 0;
+    }
+
+    ///// ====== ENGINE ====== /////
 }
 
 pub fn main() {
@@ -648,9 +867,7 @@ pub fn main() {
             _ => {}
         }
     }
-
-    //let uniformity = engine.rng.test_randf_average();
-    //println!("Uniformity with 1 billion numbers: {}", uniformity);
+    
 
     let _error_code = engine.run(hardware_accelerated);
 }
