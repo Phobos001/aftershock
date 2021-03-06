@@ -1,5 +1,10 @@
 extern crate lodepng;
 extern crate rgb;
+extern crate rusttype;
+
+use std::io;
+use std::io::prelude::*;
+use std::fs::File;
 
 use crate::color::*;
 use rgb::*;
@@ -14,10 +19,25 @@ pub struct Image {
 impl Image {
 
 	pub fn default() -> Image {
-		Image {
+		let mut img = Image {
 			buffer: Vec::new(),
-			width: 0,
-			height: 0,
+			width: 1,
+			height: 1,
+		};
+
+		// Blank pixel
+		img.buffer.push(0);
+		img.buffer.push(0);
+		img.buffer.push(0);
+		img.buffer.push(0);
+		img
+	}
+
+	pub fn new_with_size(width: usize, height: usize) -> Image {
+		Image {
+			buffer: vec![0; width * height * 4],
+			width,
+			height,
 		}
 	}
 
@@ -116,7 +136,7 @@ impl Font {
 		let fontimg: Image = Image::new(path_image);
 
 		if fontimg.buffer.len() <= 0 {
-			println!("ASERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
+			println!("ERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
 		}
 
 		//println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);
@@ -130,8 +150,64 @@ impl Font {
 		}
 	}
 
-	/// rusttype will be implemented here eventually. for now this does nothing.
-	pub fn new_ttf(path_image: &str) {
-		// TODO
+	pub fn new_ttf(path_ttf: &str, glyphidxstr: &str, glyph_spacing: i32, point_size: f32, alpha_threshold: f32) -> Font {
+		
+		let mut ttf_file = File::open(path_ttf).expect(format!("ERROR - FONT: TTF file {} does not exist!", path_ttf).as_str());
+		let mut ttf_buffer: Vec<u8> = Vec::new();
+
+		let bytecount = ttf_file.read_to_end(&mut ttf_buffer).expect("ERROR - FONT: TTF File could not be read.");
+
+		let ttf = rusttype::Font::try_from_vec(ttf_buffer).expect(format!("ERROR - FONT: TTF Font {} cannot be constructed. Make sure there is only one font inside the TTF file.", path_ttf).as_str());
+
+
+		let glyphidx = glyphidxstr.to_string().chars().collect();
+
+		let scale = rusttype::Scale::uniform(point_size);
+        let mut v_metrics = ttf.v_metrics(scale);
+        v_metrics.line_gap = point_size;
+
+        let glyphs: Vec<_> = ttf.layout(
+            glyphidxstr, 
+            rusttype::Scale::uniform(point_size), 
+            rusttype::point(0.0, v_metrics.ascent)).collect();
+
+        // work out the layout size
+        let glyphs_height = (v_metrics.ascent - v_metrics.descent).ceil() as u32;
+        let glyphs_width = {
+            let min_x = glyphs
+                .first()
+                .map(|g| g.pixel_bounding_box().unwrap().min.x)
+                .unwrap();
+            let max_x = glyphs
+                .last()
+                .map(|g| g.pixel_bounding_box().unwrap().max.x)
+                .unwrap();
+            (max_x - min_x) as u32
+        };
+
+		let mut fontimg: Image = Image::new_with_size(glyphs_width as usize, glyphs_height as usize);
+
+        for glyph in glyphs {
+            if let Some(bounding_box) = glyph.pixel_bounding_box() {
+                // Draw the glyph into the image per-pixel by using the draw closure
+                glyph.draw(|x, y, v| {
+                    fontimg.pset(
+                        // Offset the position by the glyph bounding box
+                        x as i32 + bounding_box.min.x as i32,
+                        y as i32 + bounding_box.min.y as i32,
+                        // Turn the coverage into an alpha value
+                        Color::new(255, 255, 255, if v > alpha_threshold { 255 } else { 0 })
+                    )
+                });
+            }
+        }
+
+		Font {
+			glyphidx,
+			fontimg,
+			glyph_width: point_size as usize,
+			glyph_height: point_size as usize,
+			glyph_spacing
+		}
 	}
 }

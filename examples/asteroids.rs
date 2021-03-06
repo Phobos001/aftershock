@@ -192,7 +192,7 @@ impl AsteroidsEngine {
 
         AsteroidsEngine {
             camera: Mat3::identity(),
-            camera_boomzoom: 0.0,
+            camera_boomzoom: 1.0,
 
             // Use time in seconds as counter seed, and use the first RNG key in the table.
             rng: Random::new(rng_seedcounter, 0),

@@ -35,8 +35,9 @@ impl FrameBuffer {
         }
     }
 
-    // Depreciated, originally going to be used for a poly-rasterizer but that didn't pan out.
-    /*
+
+
+    
     pub fn blit_framebuffer(&mut self, fbuf_blit: &FrameBuffer, offset_x: usize, offset_y: usize) {
         let stride = 4;
         // We blit these directly into the color buffer because otherwise we'd just be drawing everything over again and we don't have to worry about depth
@@ -86,12 +87,12 @@ impl FrameBuffer {
                         let section = rightsect.split_at_mut((extent_width - offset_x) * stride).0;
         
                         // I HAVE YOU NOW
-                        section.clone_from_slice(rows_src[i-offset_y]);
+                        section.copy_from_slice(rows_src[i-offset_y]);
                     }
                 }
             }
         });
-    }*/
+    }
 }
 
 /// Controls how a rasterizer should draw incoming pixels.
@@ -344,7 +345,7 @@ impl Rasterizer {
 
     /// Gets a color from the color buffer.
     pub fn pget(&mut self, x: i32, y: i32) -> Color {
-        let idx: usize = (y * (self.framebuffer.width as i32) + x) as usize;
+        let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
 
         let out_left: bool = x < 0;
         let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
@@ -734,7 +735,4 @@ impl Rasterizer {
 
         return pixels;
     }
-    
 }
-
-

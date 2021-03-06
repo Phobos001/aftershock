@@ -20,6 +20,10 @@ impl Random {
 		}
 	}
 
+	pub fn get_seed_from_time() -> u64 {
+		std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs()
+	}
+
 	/// Returns a random 64-bit unsigned integer
 	/// The output is uniform and will eventually produce all 2^64 numbers with the key.
 	fn rand(&mut self) -> u64 {
