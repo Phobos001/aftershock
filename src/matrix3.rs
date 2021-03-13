@@ -1,17 +1,17 @@
-use crate::vectors::*;
+use crate::vector2::*;
 
 /// 3x3 Matrix mainly for transforming 2D images, but can be used for anything.
 #[derive(Copy, Clone, Debug)]
-pub struct Mat3 {
+pub struct Matrix3 {
 	m: [[f32; 3]; 3],
 }
 
-impl Mat3 {
+impl Matrix3 {
 
 	/// Returns an identity matrix. It's basically like a normalized vector, where the 'magnitudes' of each value are 1.0.
 	/// This is usually the foundation of all matrix transformations.
-	pub fn identity() -> Mat3 {
-		Mat3 {
+	pub fn identity() -> Matrix3 {
+		Matrix3 {
 			m: [
 				[1.0, 0.0, 0.0],
 				[0.0, 1.0, 0.0],
@@ -29,40 +29,40 @@ impl Mat3 {
 	}
 
 	/// Creates a translated 3x3 Matrix
-	pub fn translated(v: Vec2) -> Mat3{
-		let mut nmtx = Mat3::identity();
+	pub fn translated(v: Vec2) -> Matrix3{
+		let mut nmtx = Matrix3::identity();
 		nmtx.m[2][0] = v.x;
 		nmtx.m[2][1] = v.y;
 		return nmtx;
 	}
 
 	/// Creates a rotated 3x3 Matrix
-	pub fn rotated(radians: f32) -> Mat3 {
-		let mut nmtx = Mat3::identity();
+	pub fn rotated(radians: f32) -> Matrix3 {
+		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][0] = radians.cos(); nmtx.m[1][0] = radians.sin();
 		nmtx.m[0][1] = -(radians.sin()); nmtx.m[1][1] = radians.cos();
 		return nmtx;
 	}
 
 	/// Creates a scaled 3x3 Matrix
-	pub fn scaled(v: Vec2) -> Mat3 {
-		let mut nmtx = Mat3::identity();
+	pub fn scaled(v: Vec2) -> Matrix3 {
+		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][0] = v.x;
 		nmtx.m[1][1] = v.y;
 		return nmtx;
 	}
 
 	/// Creates a sheared 3x3 Matrix
-	pub fn sheared(v: Vec2) -> Mat3 {
-		let mut nmtx = Mat3::identity();
+	pub fn sheared(v: Vec2) -> Matrix3 {
+		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][1] = v.x;
 		nmtx.m[1][0] = v.y;
 		return nmtx;
 	}
 
 	/// Creates an inverse of this Matrix, usually for getting correct pixel information when drawing 2D Images.
-	pub fn inv(&self) -> Mat3 {
-		let mut out = Mat3::identity();
+	pub fn inv(&self) -> Matrix3 {
+		let mut out = Matrix3::identity();
 		let det: f32 = 
 			self.m[0][0] * (self.m[1][1] * self.m[2][2] - self.m[1][2] * self.m[2][1]) -
 			self.m[1][0] * (self.m[0][1] * self.m[2][2] - self.m[2][1] * self.m[0][2]) +
@@ -84,11 +84,11 @@ impl Mat3 {
 }
 
 
-// Mat3 Operator Assignments
-impl std::ops::Mul for Mat3 {
+// Matrix3 Operator Assignments
+impl std::ops::Mul for Matrix3 {
 	type Output = Self;
 
-	fn mul(self, rhs: Mat3) -> Self::Output {
+	fn mul(self, rhs: Matrix3) -> Self::Output {
 		let mut fmtx: [[f32; 3]; 3] = [[0.0 ;3] ;3];
 		for c in 0..3 {
 			for r in 0..3 {
@@ -97,6 +97,6 @@ impl std::ops::Mul for Mat3 {
 								self.m[2][r] * rhs.m[c][2];
 			}
 		}
-		return Mat3 { m: fmtx };
+		return Matrix3 { m: fmtx };
 	}
 }

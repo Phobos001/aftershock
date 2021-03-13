@@ -120,6 +120,7 @@ impl Image {
 /// The glyph width and height tells the font how big the sections are for the glyphs in the image.
 pub struct Font {
 	pub glyphidx: Vec<char>,
+	pub glyphidx_sizes: Vec<FontGlyph>,
 	pub fontimg: Image,
 	pub glyph_width: usize,
 	pub glyph_height: usize,
@@ -133,6 +134,9 @@ impl Font {
 	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i32) -> Font {
 
 		let glyphidx = glyphidxstr.to_string().chars().collect();
+		let glyphidx_sizes: Vec<FontGlyph> = Vec::new();
+
+		
 		let fontimg: Image = Image::new(path_image);
 
 		if fontimg.buffer.len() <= 0 {
@@ -143,6 +147,7 @@ impl Font {
 
 		Font {
 			glyphidx,
+			glyphidx_sizes,
 			fontimg,
 			glyph_width,
 			glyph_height,
@@ -160,7 +165,7 @@ impl Font {
 		let ttf = rusttype::Font::try_from_vec(ttf_buffer).expect(format!("ERROR - FONT: TTF Font {} cannot be constructed. Make sure there is only one font inside the TTF file.", path_ttf).as_str());
 
 
-		let glyphidx = glyphidxstr.to_string().chars().collect();
+		let glyphidx: Vec<char> = glyphidxstr.to_string().chars().collect();
 
 		let scale = rusttype::Scale::uniform(point_size);
         let mut v_metrics = ttf.v_metrics(scale);
@@ -187,10 +192,17 @@ impl Font {
 
 		let mut fontimg: Image = Image::new_with_size(glyphs_width as usize, glyphs_height as usize);
 
-        for glyph in glyphs {
-            if let Some(bounding_box) = glyph.pixel_bounding_box() {
+		let mut glyphidx_sizes: Vec<FontGlyph> = Vec::with_capacity(glyphidx.len());
+
+        for i in 0..glyphs.len() {
+            if let Some(bounding_box) = glyphs[i].pixel_bounding_box() {
+				glyphidx_sizes[i].x = bounding_box.min.x;
+				glyphidx_sizes[i].y = bounding_box.min.y;
+				glyphidx_sizes[i].w = bounding_box.max.x;
+				glyphidx_sizes[i].h = bounding_box.max.y;
+
                 // Draw the glyph into the image per-pixel by using the draw closure
-                glyph.draw(|x, y, v| {
+                glyphs[i].draw(|x, y, v| {
                     fontimg.pset(
                         // Offset the position by the glyph bounding box
                         x as i32 + bounding_box.min.x as i32,
@@ -204,10 +216,30 @@ impl Font {
 
 		Font {
 			glyphidx,
+			glyphidx_sizes,
 			fontimg,
 			glyph_width: point_size as usize,
 			glyph_height: point_size as usize,
 			glyph_spacing
+		}
+	}
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct FontGlyph {
+	pub x: i32,
+	pub y: i32,
+	pub w: i32,
+	pub h: i32,
+}
+
+impl FontGlyph {
+	pub fn new (x: i32, y: i32, w: i32, h: i32) -> FontGlyph {
+		FontGlyph {
+			x,
+			y,
+			w,
+			h,
 		}
 	}
 }

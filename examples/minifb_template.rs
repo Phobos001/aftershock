@@ -1,7 +1,7 @@
 extern crate minifb;
 
 use aftershock::rasterizer::*;
-use aftershock::vectors::*;
+use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::assets::*;

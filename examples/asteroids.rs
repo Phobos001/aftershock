@@ -1,8 +1,8 @@
 // ECS would be perfect for this but I'm trying to keep things simple.
 
 use aftershock::rasterizer::*;
-use aftershock::vectors::*;
-use aftershock::matricies::*;
+use aftershock::vector2::*;
+use aftershock::matrix3::*;
 use aftershock::math::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
@@ -141,7 +141,7 @@ pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
 }
 
 pub struct AsteroidsEngine {
-    pub camera: Mat3,
+    pub camera: Matrix3,
     pub camera_boomzoom: f32,
 
     pub player: Player,
@@ -191,7 +191,7 @@ impl AsteroidsEngine {
         let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 
         AsteroidsEngine {
-            camera: Mat3::identity(),
+            camera: Matrix3::identity(),
             camera_boomzoom: 1.0,
 
             // Use time in seconds as counter seed, and use the first RNG key in the table.
@@ -457,7 +457,7 @@ impl AsteroidsEngine {
             }
     
             if self.is_control_down(CONTROL_THRUST_FORWARD) {
-                let direction = Mat3::rotated(self.player.rotation);
+                let direction = Matrix3::rotated(self.player.rotation);
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
@@ -465,7 +465,7 @@ impl AsteroidsEngine {
             }
     
             if self.is_control_down(CONTROL_THRUST_BACKWARD) {
-                let direction = Mat3::rotated(self.player.rotation);
+                let direction = Matrix3::rotated(self.player.rotation);
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
@@ -473,8 +473,8 @@ impl AsteroidsEngine {
             }
     
             if self.is_control_pressed(CONTROL_FIRE) {
-                let direction = Mat3::rotated(self.player.rotation).forward(Vec2::right());
-                let offset = Mat3::translated(self.player.position).forward(direction * 16.0);
+                let direction = Matrix3::rotated(self.player.rotation).forward(Vec2::right());
+                let offset = Matrix3::translated(self.player.position).forward(direction * 16.0);
                 
                 self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
             }
@@ -512,9 +512,9 @@ impl AsteroidsEngine {
 
     pub fn draw_player(&mut self) {
         // Prepare a transformation chain to get our final transformation matrix
-        let translated: Mat3 = Mat3::translated(self.player.position);
-        let rotated: Mat3 = Mat3::rotated(self.player.rotation);
-        let scaled: Mat3 = Mat3::scaled(self.player.scale);
+        let translated: Matrix3 = Matrix3::translated(self.player.position);
+        let rotated: Matrix3 = Matrix3::rotated(self.player.rotation);
+        let scaled: Matrix3 = Matrix3::scaled(self.player.scale);
 
         // Transformations are done in the order of right to left
         let mtx = self.camera * translated * rotated * scaled;
@@ -604,9 +604,9 @@ impl AsteroidsEngine {
 
     pub fn update_camera(&mut self) {
         self.camera_boomzoom = lerpf(self.camera_boomzoom, 1.0, 5.0 * self.dt);
-        let camera_scaled = Mat3::scaled(Vec2::one() * self.camera_boomzoom);
+        let camera_scaled = Matrix3::scaled(Vec2::one() * self.camera_boomzoom);
         // We need to move the camera closer to the center based on zoom since it's technically in the top-left corner
-        let camera_translated = Mat3::translated(
+        let camera_translated = Matrix3::translated(
             Vec2::new(
                 lerpf(RENDER_WIDTH as f32 / 2.0, 0.0, self.camera_boomzoom), 
                 lerpf(RENDER_HEIGHT as f32 / 2.0, 0.0, self.camera_boomzoom)
@@ -727,9 +727,9 @@ impl AsteroidsEngine {
         for asteroid in &self.asteroids {
             if asteroid.active {
                 // Prepare a transformation chain to get our final transformation matrix
-                let translated: Mat3 = Mat3::translated(asteroid.position);
-                let rotated: Mat3 = Mat3::rotated(asteroid.rotation);
-                let scaled: Mat3 = Mat3::scaled(asteroid.scale);
+                let translated: Matrix3 = Matrix3::translated(asteroid.position);
+                let rotated: Matrix3 = Matrix3::rotated(asteroid.rotation);
+                let scaled: Matrix3 = Matrix3::scaled(asteroid.scale);
 
                 // Transformations are done in the order of right to left
                 let mtx = self.camera * translated * rotated * scaled;

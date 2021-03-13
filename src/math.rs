@@ -1,4 +1,4 @@
-use crate::vectors::*;
+use crate::vector2::*;
 
 /// Clamps a 32-bit float between the min and max range.
 pub fn clampf(value: f32, min: f32, max: f32) -> f32 {

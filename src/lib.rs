@@ -6,22 +6,14 @@
 #![crate_name = "aftershock"]
 #![crate_type = "lib"]
 
+pub mod three;
 pub mod rasterizer;
 pub mod assets;
 pub mod math;
 pub mod drawables;
-pub mod matricies;
-pub mod vectors;
+pub mod matrix3;
+pub mod matrix4;
+pub mod vector2;
+pub mod vector3;
 pub mod color;
 pub mod random;
-
-pub mod all {
-	pub use crate::rasterizer::*;
-	pub use crate::assets::*;
-	pub use crate::math::*;
-	pub use crate::drawables::*;
-	pub use crate::matricies::*;
-	pub use crate::vectors::*;
-	pub use crate::color::*;
-	pub use crate::random::*;
-}

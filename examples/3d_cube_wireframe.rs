@@ -1,7 +1,9 @@
 use aftershock::rasterizer::*;
-use aftershock::vector2::*;
+use aftershock::vector3::*;
+use aftershock::matrix4::*;
+use aftershock::three::*;
 use aftershock::color::*;
-use aftershock::drawables::*;
+
 use aftershock::assets::*;
 
 use std::time::Instant;
@@ -10,8 +12,8 @@ use sdl2::event::Event;
 
 use sdl2::pixels::{PixelFormatEnum};
 
-const RENDER_WIDTH: usize = 640;
-const RENDER_HEIGHT: usize = 360;
+const RENDER_WIDTH: usize = 1280;
+const RENDER_HEIGHT: usize = 720;
 
 pub enum VideoMode {
     Exclusive,
@@ -42,7 +44,7 @@ impl TemplateEngine {
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
-            video_mode: VideoMode::Fullscreen,
+            video_mode: VideoMode::Windowed,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -118,20 +120,11 @@ impl TemplateEngine {
         let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
         let sysfont: Font = Font::new("core/tiny_font.png", font_glyphidx, 5, 5, -1);
 
-        // Spritefont example. More flexible than the standard pprint but also more expensive.
-        let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 8.0);
-        spritefont_test.position = Vec2::new(256.0, 128.0);
-
-        // Image example
-        let scotty = Image::new("core/scotty_transparent.png");
-
-        // Image example for transparency
-        let graphics_and_shit = Image::new("core/default.png");
-
         let mut printtime: f32 = 0.0;
 
-        let mut mouse_x: f32 = 0.0;
-        let mut mouse_y: f32 = 0.0;
+        // 3D Setup
+        let cube = Mesh::new_cube();
+        let projection: Projection = Projection::perspective(0.1, 1024.0, 90.0, RENDER_WIDTH as f32, RENDER_HEIGHT as f32);
 
         'running: loop {
             self.update_times();
@@ -147,23 +140,6 @@ impl TemplateEngine {
                 }
             }
 
-            let mouse_state = event_pump.mouse_state();
-
-            // Mouse Updating
-            let display_mode = video_subsystem.current_display_mode(0).unwrap();
-            let (window_width, window_height) = canvas.window().size();
-            let screen_width = display_mode.w as f32;
-            let screen_height = display_mode.h as f32;
-
-            mouse_x = mouse_state.x() as f32;
-            mouse_y = mouse_state.y() as f32;
-
-            let mouse_scalar_x = RENDER_WIDTH as f32 / window_width as f32;
-            let mouse_scalar_y = RENDER_HEIGHT as f32 / window_height as f32;
-
-            mouse_x *= mouse_scalar_x;
-            mouse_y *= mouse_scalar_y;
-
             // Print FPS and DT info
             printtime += self.dt_unscaled;
             if printtime > 1.0 {
@@ -173,25 +149,11 @@ impl TemplateEngine {
             }
 
             // == GRAPHICS ==
-            self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            self.rasterizer.cls();
 
-            // High level spritefont example
-            spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
-            spritefont_test.scale = Vec2::one() * self.realtime.cos();
-            spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
-            spritefont_test.draw(&mut self.rasterizer);
-
+            // Draw wireframe of mesh
+            cube.draw_normals(&mut self.rasterizer, &projection, true, true);
             
-            // Image Drawing
-            self.rasterizer.pimg(&scotty, mouse_x as i32, mouse_y as i32);
-
-            // Image Drawing but T R A N S P A R E N T
-            self.rasterizer.set_draw_mode(DrawMode::Alpha);
-            self.rasterizer.opacity = 128;
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
-            self.rasterizer.opacity = 255;
-            self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
             let total_pixels = self.rasterizer.drawn_pixels_since_cls;
             self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);

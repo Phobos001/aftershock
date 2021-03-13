@@ -1,4 +1,8 @@
-use crate::all::*;
+use crate::color::*;
+use crate::vector2::*;
+use crate::matrix3::*;
+use crate::assets::*;
+use crate::math::*;
 
 pub type PSetOp = fn(&mut Rasterizer, usize, Color);
 
@@ -497,10 +501,10 @@ impl Rasterizer {
 
     /// Draws a rotated and scaled image to the screen using matrix multiplication.
     pub fn pimgmtx(&mut self, image: &Image, position: Vec2, rotation: f32, scale: Vec2, offset: Vec2) {
-        let mtx_o = Mat3::translated(offset);
-        let mtx_r = Mat3::rotated(rotation);
-        let mtx_p = Mat3::translated(position);
-        let mtx_s = Mat3::scaled(scale);
+        let mtx_o = Matrix3::translated(offset);
+        let mtx_r = Matrix3::rotated(rotation);
+        let mtx_p = Matrix3::translated(position);
+        let mtx_s = Matrix3::scaled(scale);
 
         let cmtx = mtx_p * mtx_r * mtx_s * mtx_o;
 
