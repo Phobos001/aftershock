@@ -72,7 +72,7 @@ impl TemplateEngine {
 
         // Spritefont example. More flexible than the standard pprint but also more expensive.
         let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 8.0);
-        spritefont_test.position = Vec2::new(256.0, 128.0);
+        spritefont_test.position = Vector2::new(256.0, 128.0);
 
         // Image example
         let scotty = Image::new("core/scotty_transparent.png");
@@ -96,7 +96,7 @@ impl TemplateEngine {
 
             // High level spritefont example
             spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
-            spritefont_test.scale = Vec2::one() * self.realtime.cos();
+            spritefont_test.scale = Vector2::one() * self.realtime.cos();
             spritefont_test.text = "THIS IS MY BROTHER SCOTTY\nHE IS THE BEST BROTHER EVER!".to_string();
             spritefont_test.draw(&mut self.rasterizer);
 

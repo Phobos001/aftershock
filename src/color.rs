@@ -2,7 +2,7 @@
 
 use crate::math::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Color {
 	pub r: u8,
 	pub g: u8,

@@ -41,17 +41,17 @@ pub fn lerpi(a: i32, b: i32, t: f32) -> i32 {
 }
 
 /// Returns the dot product of two 2D vectors.
-pub fn dot2(v1: Vec2, v2: Vec2) -> f32 {
+pub fn dot2(v1: Vector2, v2: Vector2) -> f32 {
 	v1.x * v2.x + v1.y * v2.y
 }
 
 /// Returns the cross product of two 2D vectors.
-pub fn cross2(v1: Vec2, v2: Vec2) -> f32 {
+pub fn cross2(v1: Vector2, v2: Vector2) -> f32 {
 	(v1.x * v2.y) - (v1.y * v2.x)
 }
 
 /// Returns the 2D distance between two points.
-pub fn dist2(v1: Vec2, v2: Vec2) -> f32{
+pub fn dist2(v1: Vector2, v2: Vector2) -> f32{
 	((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
 }
 
@@ -65,10 +65,10 @@ pub fn dist3(x0: f32, y0: f32, z0: f32, x1: f32, y1: f32, z1: f32) -> f32{
 /// This is basically used to a UV coordinate for textured triangles.
 /// You'd loop over the triangle's UV's and use these values somehow to draw it correctly.
 /// I don't think I need it though. If you guys can use it then by all means go ahead! 
-pub fn barycentric2(v1: Vec2, v2: Vec2, v3: Vec2) -> (f32, f32, f32) {
-	let b0 = Vec2::new(v2.x - v1.x, v2.y - v1.y);
-	let b1 = Vec2::new(v3.x - v1.x, v3.y - v1.y);
-	let b2 = Vec2::new(v1.x - v2.x, v1.y - v2.y);
+pub fn barycentric2(v1: Vector2, v2: Vector2, v3: Vector2) -> (f32, f32, f32) {
+	let b0 = Vector2::new(v2.x - v1.x, v2.y - v1.y);
+	let b1 = Vector2::new(v3.x - v1.x, v3.y - v1.y);
+	let b2 = Vector2::new(v1.x - v2.x, v1.y - v2.y);
 
     let d00 = dot2(b0, b0);
     let d01 = dot2(b0, b1);

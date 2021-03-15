@@ -8,12 +8,12 @@ use crate::rasterizer::*;
 pub struct Sprite<'a> {
     pub tint: Color,
     pub opacity: u8,
-	pub offset: Vec2,
+	pub offset: Vector2,
 	pub image: &'a Image,
-	pub position: Vec2,
+	pub position: Vector2,
 	pub rotation: f32,
-	pub scale: Vec2,
-    pub shear: Vec2,
+	pub scale: Vector2,
+    pub shear: Vector2,
 }
 
 impl<'a> Sprite<'a> {
@@ -22,11 +22,11 @@ impl<'a> Sprite<'a> {
             image,
             tint,
             opacity: 255,
-			offset: Vec2::new(-(image.width as f32) / 2.0, -(image.height as f32) / 2.0),
-			position: Vec2::new(x, y),
+			offset: Vector2::new(-(image.width as f32) / 2.0, -(image.height as f32) / 2.0),
+			position: Vector2::new(x, y),
 			rotation: a,
-			scale: Vec2::new(sx, sy),
-            shear: Vec2::one(),
+			scale: Vector2::new(sx, sy),
+            shear: Vector2::one(),
 		}
 	}
 
@@ -56,10 +56,10 @@ pub struct SpriteFont {
     pub tint: Color,
     pub opacity: u8,
 
-    pub position: Vec2,
-    pub scale: Vec2,
+    pub position: Vector2,
+    pub scale: Vector2,
     pub rotation: f32,
-    pub offset: Vec2,
+    pub offset: Vector2,
 }
 
 impl SpriteFont {
@@ -93,10 +93,10 @@ impl SpriteFont {
             tint: Color::white(),
             opacity: 255,
 
-            position: Vec2::zero(),
-            scale: Vec2::one(),
+            position: Vector2::zero(),
+            scale: Vector2::one(),
             rotation: 0.0,
-            offset: Vec2::zero(),
+            offset: Vector2::zero(),
         }
     }
 
@@ -114,7 +114,7 @@ impl SpriteFont {
                     
                     rasterizer.tint = self.tint;
                     rasterizer.opacity = self.opacity;
-                    rasterizer.pimgmtx(&self.glyphs[j].image, self.position + Vec2::new(jumpx, jumpy),
+                    rasterizer.pimgmtx(&self.glyphs[j].image, self.position + Vector2::new(jumpx, jumpy),
                         self.rotation,
                         self.scale,
                         self.offset);

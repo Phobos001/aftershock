@@ -1,4 +1,8 @@
-use crate::{matrix4::*, color::*, vector3::*, rasterizer::*};
+extern crate gltf;
+
+use crate::{matrix4::*, color::*, vector2::*, vector3::*, rasterizer::*, quaternion::*};
+
+use std::rc::Rc;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Triangle {
@@ -7,6 +11,14 @@ pub struct Triangle {
 
 pub struct Mesh {
 	pub triangles: Vec<Triangle>,
+	pub uvs: Vec<Vector2>,
+}
+
+pub struct MeshRenderer {
+	pub position: Vector3,
+	pub rotation: Vector3,
+	pub scale: Vector3,
+	pub mesh: Rc<Mesh>,
 }
 
 
@@ -48,16 +60,7 @@ impl Projection {
 		self.mtx.m[3][3] = 0.0;
 	}
 
-	pub fn project_triangle(&self, itriangle: &Triangle) -> Triangle {
-
-		let mut triangle = itriangle.clone();
-		triangle.v1.z += 3.0;
-		triangle.v2.z += 3.0;
-		triangle.v3.z += 3.0;
-
-		triangle.v1 += Vector3::one();
-		triangle.v2 += Vector3::one();
-		triangle.v3 += Vector3::one();
+	pub fn project_triangle(&self, triangle: &Triangle) -> Triangle {
 
 		// Multiply the triangle against the projection matrix
 		let mut projected_triangle = Triangle {
@@ -99,62 +102,10 @@ impl Triangle {
 }
 
 impl Mesh {
-	pub fn draw_flat(&self, rasterizer: &mut Rasterizer, projection: &Projection, color: Color, wireframe: bool, cull_backfaces: bool) {
-		let mut projected_triangles: Vec<Triangle> = Vec::with_capacity(self.triangles.len());
-
-		for triangle in &self.triangles {
-			projected_triangles.push(projection.project_triangle(triangle));
-		}
-
-		for triangle in &projected_triangles {
-			let line1: Vector3 = triangle.v2 - triangle.v1;
-			let line2: Vector3 = triangle.v3 - triangle.v1;
-			let normal: Vector3 = -Vector3::cross(line1, line2).normalized();
-				
-			if normal.z < 0.0 && cull_backfaces { continue; }
-
-			rasterizer.ptriangle(!wireframe, 
-				triangle.v1.x as i32, triangle.v1.y as i32,
-				triangle.v2.x as i32, triangle.v2.y as i32,
-				triangle.v3.x as i32, triangle.v3.y as i32,
-				color
-			);
-		}
-	}
-
-	pub fn draw_normals(&self, rasterizer: &mut Rasterizer, projection: &Projection, wireframe: bool, cull_backfaces: bool) {
-		let mut projected_triangles: Vec<Triangle> = Vec::with_capacity(self.triangles.len());
-
-		for triangle in &self.triangles {
-			projected_triangles.push(projection.project_triangle(triangle));
-		}
-
-		for triangle in &projected_triangles {
-			let line1: Vector3 = triangle.v2 - triangle.v1;
-			let line2: Vector3 = triangle.v3 - triangle.v1;
-			let normal: Vector3 = Vector3::cross(line1, line2).normalized();
-				
-			if normal.z > 0.0 && cull_backfaces { continue; }
-
-			let color = Color::new(
-				(((normal.x + 1.0) * 0.5) * 255.0) as u8,
-				(((normal.y + 1.0) * 0.5) * 255.0) as u8,
-				(((normal.z + 1.0) * 0.5) * 255.0) as u8,
-				255
-			);
-
-			rasterizer.ptriangle(!wireframe, 
-				triangle.v1.x as i32, triangle.v1.y as i32,
-				triangle.v2.x as i32, triangle.v2.y as i32,
-				triangle.v3.x as i32, triangle.v3.y as i32,
-				color
-			);
-		}
-	}
-
 	pub fn new_empty() -> Mesh {
 		Mesh {
 			triangles: Vec::new(),
+			uvs: Vec::new(),
 		}
 	}
 
@@ -186,6 +137,92 @@ impl Mesh {
 				Triangle::new_f32(1.0, 0.0, 1.0,	0.0, 0.0, 0.0,		1.0, 0.0, 0.0 ),
 
 			],
+			uvs: Vec::new(),
+		}
+	}
+}
+
+impl MeshRenderer {
+
+	pub fn new(mesh: Rc<Mesh>) -> MeshRenderer {
+		MeshRenderer {
+			position: Vector3::zero(),
+			rotation: Vector3::zero(),
+			scale: Vector3::one(),
+			mesh,
+		}
+	}
+
+	pub fn draw_flat(&self, rasterizer: &mut Rasterizer, projection: &Projection, color: Color, wireframe: bool, cull_backfaces: bool) {
+		for triangle in &self.mesh.triangles {
+			let translation = Matrix4::translated(self.position);
+			let rotation = Matrix4::rotated(self.rotation.z, self.rotation.y, self.rotation.x);
+			let scaled = Matrix4::scaled(self.scale);
+
+			let transform: Matrix4 = translation /* * rotation */ * scaled;
+
+			let transformed_triangle = transform.transform_triangle(*triangle);
+			let projected_triangle = projection.project_triangle(&transformed_triangle);
+
+			// Actual Drawing
+			let line1: Vector3 = projected_triangle.v2 - projected_triangle.v1;
+			let line2: Vector3 = projected_triangle.v3 - projected_triangle.v1;
+			let normal: Vector3 = Vector3::cross(line1, line2).normalized();
+			
+			let is_backface: bool = normal.x * transformed_triangle.v1.x +
+									normal.y * transformed_triangle.v1.y +
+									normal.z * transformed_triangle.v1.y >= 0.0;
+
+			if is_backface && cull_backfaces { continue; }
+
+			
+
+			rasterizer.ptriangle(!wireframe, 
+				projected_triangle.v1.x as i32, projected_triangle.v1.y as i32,
+				projected_triangle.v2.x as i32, projected_triangle.v2.y as i32,
+				projected_triangle.v3.x as i32, projected_triangle.v3.y as i32,
+				color
+			);
+		}
+	}
+
+	pub fn draw_lit_directional(&self, rasterizer: &mut Rasterizer, projection: &Projection, color: Color, wireframe: bool, cull_backfaces: bool, lightdir: Vector3) {
+		for triangle in &self.mesh.triangles {
+			let translation = Matrix4::translated(self.position);
+			let rotation = Matrix4::rotated(self.rotation.z, self.rotation.y, self.rotation.x);
+			let scaled = Matrix4::scaled(self.scale);
+
+			let transform: Matrix4 = translation  * rotation  * scaled;
+
+			let transformed_triangle = transform.transform_triangle(*triangle);
+			let projected_triangle = projection.project_triangle(&transformed_triangle);
+
+			// Actual Drawing
+			let line1: Vector3 = transformed_triangle.v2 - transformed_triangle.v1;
+			let line2: Vector3 = transformed_triangle.v3 - transformed_triangle.v1;
+			let normal: Vector3 = Vector3::cross(line1, line2).normalized();
+			
+			let is_backface: bool = normal.x * transformed_triangle.v1.x +
+									normal.y * transformed_triangle.v1.y +
+									normal.z * transformed_triangle.v1.y >= 0.0;
+
+			if is_backface && cull_backfaces { continue; }
+
+			let nlightdir = lightdir.normalized();
+
+			let dot_normal_lightdir = Vector3::dot(normal, nlightdir);
+			
+
+			let lum: u8 = (((dot_normal_lightdir + 1.0) * 0.5) * 255.0) as u8;
+
+			let lit_color = color * Color::new(lum, lum, lum, 255) ;
+
+			rasterizer.ptriangle(!wireframe, 
+				projected_triangle.v1.x as i32, projected_triangle.v1.y as i32,
+				projected_triangle.v2.x as i32, projected_triangle.v2.y as i32,
+				projected_triangle.v3.x as i32, projected_triangle.v3.y as i32,
+				lit_color
+			);
 		}
 	}
 }

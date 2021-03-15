@@ -12,8 +12,8 @@ use sdl2::event::Event;
 
 use sdl2::pixels::{PixelFormatEnum};
 
-const RENDER_WIDTH: usize = 1280;
-const RENDER_HEIGHT: usize = 720;
+const RENDER_WIDTH: usize = 640;
+const RENDER_HEIGHT: usize = 360;
 
 pub enum VideoMode {
     Exclusive,
@@ -44,7 +44,7 @@ impl TemplateEngine {
 
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
-            video_mode: VideoMode::Windowed,
+            video_mode: VideoMode::Fullscreen,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -123,7 +123,10 @@ impl TemplateEngine {
         let mut printtime: f32 = 0.0;
 
         // 3D Setup
+        let default = Image::new("core/default.png");
+
         let cube = Mesh::new_cube();
+        let mut cube_renderer = MeshRenderer::new(std::rc::Rc::new(cube));
         let projection: Projection = Projection::perspective(0.1, 1024.0, 90.0, RENDER_WIDTH as f32, RENDER_HEIGHT as f32);
 
         'running: loop {
@@ -148,11 +151,16 @@ impl TemplateEngine {
                 printtime = 0.0;
             }
 
+            cube_renderer.position += Vector3::new(1.0, 0.5, 1.0) * self.dt;
+            cube_renderer.rotation.x = self.realtime;
+
             // == GRAPHICS ==
             self.rasterizer.cls();
 
             // Draw wireframe of mesh
-            cube.draw_normals(&mut self.rasterizer, &projection, true, true);
+            cube_renderer.draw_lit_directional(&mut self.rasterizer, &projection, 
+                Color::hsv(self.realtime * 90.0, 1.0, 1.0), false, true,
+                 Vector3::new(-1.0, -1.0, 1.0));
             
 
             let total_pixels = self.rasterizer.drawn_pixels_since_cls;

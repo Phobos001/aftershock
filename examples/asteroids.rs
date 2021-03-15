@@ -35,21 +35,21 @@ pub enum VideoMode {
 #[derive(Debug, Clone, Copy)]
 pub struct Player {
     pub active: bool,
-    pub velocity: Vec2,
-    pub position: Vec2,
+    pub velocity: Vector2,
+    pub position: Vector2,
     pub rotation: f32,
     pub radius: f32,
-    pub scale: Vec2,
+    pub scale: Vector2,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Bullet {
     pub active: bool,
-    pub velocity: Vec2,
-    pub position: Vec2,
+    pub velocity: Vector2,
+    pub position: Vector2,
     pub rotation: f32,
     pub radius: f32,
-    pub scale: Vec2,
+    pub scale: Vector2,
     pub lifetime: f32,
 }
 
@@ -57,11 +57,11 @@ impl Bullet {
     pub fn new() -> Bullet {
         Bullet {
             active: false,
-            velocity: Vec2::zero(),
-            position: Vec2::zero(),
+            velocity: Vector2::zero(),
+            position: Vector2::zero(),
             rotation: 0.0,
             radius: 0.0,
-            scale: Vec2::one(),
+            scale: Vector2::one(),
             lifetime: 0.0,
         }
     }
@@ -70,12 +70,12 @@ impl Bullet {
 #[derive(Debug, Clone, Copy)]
 pub struct Asteroid {
     pub active: bool,
-    pub shape: [Vec2; 8],
-    pub velocity: Vec2,
-    pub position: Vec2,
+    pub shape: [Vector2; 8],
+    pub velocity: Vector2,
+    pub position: Vector2,
     pub rotation: f32,
     pub radius: f32,
-    pub scale: Vec2,
+    pub scale: Vector2,
     pub health: u8,
 }
 
@@ -83,33 +83,33 @@ impl Asteroid {
     pub fn new() -> Asteroid {
         Asteroid {
             active: false,
-            shape: [Vec2::zero(); 8],
-            velocity: Vec2::zero(),
-            position: Vec2::zero(),
+            shape: [Vector2::zero(); 8],
+            velocity: Vector2::zero(),
+            position: Vector2::zero(),
             rotation: 0.0,
             radius: 0.0,
-            scale: Vec2::one(),
+            scale: Vector2::one(),
             health: 3,
         }
     }
 
-    pub fn generate_shape(radius: f32, rng: &mut Random) -> [Vec2; 8] {
-        let mut points: [Vec2; 8] = [
-            Vec2::new(1.0, 0.0), // Right
-            Vec2::new(0.5, 0.5), // Bottom Right
-            Vec2::new(0.0, 1.0), // Bottom
-            Vec2::new(-0.5, 0.5), // Bottom Left
-            Vec2::new(-1.0, 0.0), // Left
-            Vec2::new(-0.5, -0.5), // Top Left
-            Vec2::new(0.0, -1.0), // Top
-            Vec2::new(0.5, -0.5), // Top Right
+    pub fn generate_shape(radius: f32, rng: &mut Random) -> [Vector2; 8] {
+        let mut points: [Vector2; 8] = [
+            Vector2::new(1.0, 0.0), // Right
+            Vector2::new(0.5, 0.5), // Bottom Right
+            Vector2::new(0.0, 1.0), // Bottom
+            Vector2::new(-0.5, 0.5), // Bottom Left
+            Vector2::new(-1.0, 0.0), // Left
+            Vector2::new(-0.5, -0.5), // Top Left
+            Vector2::new(0.0, -1.0), // Top
+            Vector2::new(0.5, -0.5), // Top Right
         ];
 
         // Some noise to make them look more natrual
         // Does not effect collisions
         for p in points.iter_mut() {
             *p *= radius;
-            *p += Vec2::new(rng.randf_range(-2.0, 2.0), rng.randf_range(-2.0, 2.0));
+            *p += Vector2::new(rng.randf_range(-2.0, 2.0), rng.randf_range(-2.0, 2.0));
         }
 
         points
@@ -118,23 +118,23 @@ impl Asteroid {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ExplosionParticle {
-    pub position: Vec2,
-    pub velocity: Vec2,
+    pub position: Vector2,
+    pub velocity: Vector2,
     pub radius: f32,
 }
 
 impl ExplosionParticle {
     pub fn new() -> ExplosionParticle {
         ExplosionParticle {
-            position: Vec2::zero(),
-            velocity: Vec2::zero(),
+            position: Vector2::zero(),
+            velocity: Vector2::zero(),
             radius: 0.0,
         }
     }
 }
 
 /// If the squared distance between the two points is smaller than the combined diameter's squared, then the two circles are overlapping!
-pub fn circle_overlap(p1: Vec2, r1: f32, p2: Vec2, r2: f32) -> bool {
+pub fn circle_overlap(p1: Vector2, r1: f32, p2: Vector2, r2: f32) -> bool {
     // Double the incoming radius's so they are diameter's instead.
     let (r1, r2) = (r1 * 2.0, r2 * 2.0);
     (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
@@ -198,7 +198,7 @@ impl AsteroidsEngine {
             rng: Random::new(rng_seedcounter, 0),
             rng_number: 0.0,
 
-            player: Player { active: true, velocity: Vec2::new(0.0, 0.0), position: Vec2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vec2::one()},
+            player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::one()},
             asteroids: [Asteroid::new(); 128],
             bullets: [Bullet::new(); 128],
 
@@ -461,7 +461,7 @@ impl AsteroidsEngine {
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
-                self.player.velocity += direction.forward(Vec2::right() * 64.0) * self.dt;
+                self.player.velocity += direction.forward(Vector2::right() * 64.0) * self.dt;
             }
     
             if self.is_control_down(CONTROL_THRUST_BACKWARD) {
@@ -469,11 +469,11 @@ impl AsteroidsEngine {
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
-                self.player.velocity -= direction.forward(Vec2::right() * 64.0) * self.dt;
+                self.player.velocity -= direction.forward(Vector2::right() * 64.0) * self.dt;
             }
     
             if self.is_control_pressed(CONTROL_FIRE) {
-                let direction = Matrix3::rotated(self.player.rotation).forward(Vec2::right());
+                let direction = Matrix3::rotated(self.player.rotation).forward(Vector2::right());
                 let offset = Matrix3::translated(self.player.position).forward(direction * 16.0);
                 
                 self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
@@ -521,10 +521,10 @@ impl AsteroidsEngine {
 
         // Defines an arrow looking thing to represent the player
         let player_points = [
-            Vec2::new(8.0, 0.0),
-            Vec2::new(-8.0, 8.0),
-            Vec2::new(-5.0, 0.0),
-            Vec2::new(-8.0, -8.0),
+            Vector2::new(8.0, 0.0),
+            Vector2::new(-8.0, 8.0),
+            Vector2::new(-5.0, 0.0),
+            Vector2::new(-8.0, -8.0),
         ];
 
         // Transform points into world space
@@ -555,14 +555,14 @@ impl AsteroidsEngine {
 
     ///// ====== EFFECTS ====== /////
 
-    pub fn spawn_explosion(&mut self, position: Vec2) {
+    pub fn spawn_explosion(&mut self, position: Vector2) {
         let mut spawn_counter = 32;
         for i in 0..self.explosion_particles.len() {
             if spawn_counter > 0 {
                 if self.explosion_particles[i].radius <= 0.1 {
                     self.explosion_particles[i].radius = self.rng.randf_range(4.0, 16.0);
                     self.explosion_particles[i].position = position;
-                    self.explosion_particles[i].velocity = Vec2::new(
+                    self.explosion_particles[i].velocity = Vector2::new(
                         self.rng.randf_range(-1.0, 1.0),
                         self.rng.randf_range(-1.0, 1.0)
                     ) * self.rng.randf_range(8.0, 256.0);
@@ -579,7 +579,7 @@ impl AsteroidsEngine {
             if self.explosion_particles[i].radius > 0.1 {
                 self.explosion_particles[i].position += self.explosion_particles[i].velocity * self.dt;
                 self.explosion_particles[i].radius = lerpf(self.explosion_particles[i].radius, 0.0, 0.5 * self.dt);
-                self.explosion_particles[i].velocity = Vec2::lerp(self.explosion_particles[i].velocity, Vec2::up(), 1.0 * self.dt);
+                self.explosion_particles[i].velocity = Vector2::lerp(self.explosion_particles[i].velocity, Vector2::up(), 1.0 * self.dt);
             }
             
         }
@@ -604,10 +604,10 @@ impl AsteroidsEngine {
 
     pub fn update_camera(&mut self) {
         self.camera_boomzoom = lerpf(self.camera_boomzoom, 1.0, 5.0 * self.dt);
-        let camera_scaled = Matrix3::scaled(Vec2::one() * self.camera_boomzoom);
+        let camera_scaled = Matrix3::scaled(Vector2::one() * self.camera_boomzoom);
         // We need to move the camera closer to the center based on zoom since it's technically in the top-left corner
         let camera_translated = Matrix3::translated(
-            Vec2::new(
+            Vector2::new(
                 lerpf(RENDER_WIDTH as f32 / 2.0, 0.0, self.camera_boomzoom), 
                 lerpf(RENDER_HEIGHT as f32 / 2.0, 0.0, self.camera_boomzoom)
             ));
@@ -626,13 +626,13 @@ impl AsteroidsEngine {
 
     ///// ====== BULLET ====== /////
 
-    pub fn spawn_bullet(&mut self, offset: Vec2, direction: Vec2, force: f32) {
+    pub fn spawn_bullet(&mut self, offset: Vector2, direction: Vector2, force: f32) {
         let mut bullet = &mut self.bullets[self.uidx_bullets % self.bullets.len()];
 
         bullet.position = offset;
         bullet.velocity = direction * force;
         bullet.radius = 2.0;
-        bullet.scale = Vec2::one();
+        bullet.scale = Vector2::one();
         bullet.rotation = 0.0; // Really if the bullets don't end up being dots this would be useful, otherwise not really.
         bullet.active = true;    // Kinda expensive to do it this way but it's simple
 
@@ -677,9 +677,9 @@ impl AsteroidsEngine {
 
         asteroid.radius = self.rng.randf_range(4.0, 16.0);
         asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
-        asteroid.position = Vec2::new(self.rng.randf_range(0.0, RENDER_WIDTH as f32), self.rng.randf_range(0.0, RENDER_HEIGHT as f32));
+        asteroid.position = Vector2::new(self.rng.randf_range(0.0, RENDER_WIDTH as f32), self.rng.randf_range(0.0, RENDER_HEIGHT as f32));
         asteroid.rotation = self.rng.randf_range(0.0, 6.28);
-        asteroid.velocity = Vec2::new(self.rng.randf_range(-1.0, 1.0), self.rng.randf_range(-1.0, 1.0)) * self.rng.randf_range(2.0, 64.0);
+        asteroid.velocity = Vector2::new(self.rng.randf_range(-1.0, 1.0), self.rng.randf_range(-1.0, 1.0)) * self.rng.randf_range(2.0, 64.0);
         asteroid.active = true;
 
         self.uidx_asteroids += 1;
@@ -781,18 +781,18 @@ impl AsteroidsEngine {
 
     pub fn draw_score(&mut self) {
         self.sf_score.text = format!("{:0>8}", self.score);
-        self.sf_score.scale = Vec2::new(10.0, 10.0);
+        self.sf_score.scale = Vector2::new(10.0, 10.0);
         self.sf_score.spacing_horizontal = 64.0;
         self.sf_score.opacity = if self.sf_score.opacity > 32 { self.sf_score.opacity - 1} else { 32 };
-        self.sf_score.position = Vec2::new(8.0, 450.0);
+        self.sf_score.position = Vector2::new(8.0, 450.0);
         self.sf_score.draw(&mut self.rasterizer);
     }
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
         let total_pixels = self.rasterizer.drawn_pixels_since_cls;
         spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
-        spritefont.scale = Vec2::new(2.0, 2.0);
-        spritefont.position = Vec2::new(8.0, 8.0);
+        spritefont.scale = Vector2::new(2.0, 2.0);
+        spritefont.position = Vector2::new(8.0, 8.0);
         spritefont.opacity = 128;
         spritefont.draw(&mut self.rasterizer);
     }
@@ -829,8 +829,8 @@ impl AsteroidsEngine {
 
     pub fn restart_game(&mut self) {
         self.player.active = true;
-        self.player.position = Vec2::new(RENDER_WIDTH as f32 / 2.0, RENDER_HEIGHT as f32 / 2.0);
-        self.player.velocity = Vec2::zero();
+        self.player.position = Vector2::new(RENDER_WIDTH as f32 / 2.0, RENDER_HEIGHT as f32 / 2.0);
+        self.player.velocity = Vector2::zero();
         self.player.rotation = 0.0;
 
         for asteroid in &mut self.asteroids {

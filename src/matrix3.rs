@@ -21,15 +21,15 @@ impl Matrix3 {
 	}
 
 	/// Receives a 2D Vector and returns a transformed copy of it.
-	pub fn forward(&self, in_vec: Vec2) -> Vec2 {
-		let mut out = Vec2::new(0.0, 0.0);
+	pub fn forward(&self, in_vec: Vector2) -> Vector2 {
+		let mut out = Vector2::new(0.0, 0.0);
 		out.x = in_vec.x * self.m[0][0] + in_vec.y * self.m[1][0] + self.m[2][0];
 		out.y = in_vec.x * self.m[0][1] + in_vec.y * self.m[1][1] + self.m[2][1];
 		return out;
 	}
 
 	/// Creates a translated 3x3 Matrix
-	pub fn translated(v: Vec2) -> Matrix3{
+	pub fn translated(v: Vector2) -> Matrix3{
 		let mut nmtx = Matrix3::identity();
 		nmtx.m[2][0] = v.x;
 		nmtx.m[2][1] = v.y;
@@ -45,7 +45,7 @@ impl Matrix3 {
 	}
 
 	/// Creates a scaled 3x3 Matrix
-	pub fn scaled(v: Vec2) -> Matrix3 {
+	pub fn scaled(v: Vector2) -> Matrix3 {
 		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][0] = v.x;
 		nmtx.m[1][1] = v.y;
@@ -53,7 +53,7 @@ impl Matrix3 {
 	}
 
 	/// Creates a sheared 3x3 Matrix
-	pub fn sheared(v: Vec2) -> Matrix3 {
+	pub fn sheared(v: Vector2) -> Matrix3 {
 		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][1] = v.x;
 		nmtx.m[1][0] = v.y;

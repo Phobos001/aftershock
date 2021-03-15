@@ -500,7 +500,7 @@ impl Rasterizer {
     }
 
     /// Draws a rotated and scaled image to the screen using matrix multiplication.
-    pub fn pimgmtx(&mut self, image: &Image, position: Vec2, rotation: f32, scale: Vec2, offset: Vec2) {
+    pub fn pimgmtx(&mut self, image: &Image, position: Vector2, rotation: f32, scale: Vector2, offset: Vector2) {
         let mtx_o = Matrix3::translated(offset);
         let mtx_r = Matrix3::rotated(rotation);
         let mtx_p = Matrix3::translated(position);
@@ -509,26 +509,26 @@ impl Rasterizer {
         let cmtx = mtx_p * mtx_r * mtx_s * mtx_o;
 
         // We have to get the rotated bounding box of the rotated sprite in order to draw it correctly without blank pixels
-        let start_center: Vec2 = cmtx.forward(Vec2::zero());
+        let start_center: Vector2 = cmtx.forward(Vector2::zero());
         let (mut sx, mut sy, mut ex, mut ey) = (start_center.x, start_center.y, start_center.x, start_center.y);
 
         // Top-Left Corner
-        let p1: Vec2 = cmtx.forward(Vec2::zero());
+        let p1: Vector2 = cmtx.forward(Vector2::zero());
         sx = f32::min(sx, p1.x); sy = f32::min(sy, p1.y);
         ex = f32::max(ex, p1.x); ey = f32::max(ey, p1.y);
 
         // Bottom-Right Corner
-        let p2: Vec2 = cmtx.forward(Vec2::new(image.width as f32, image.height as f32));
+        let p2: Vector2 = cmtx.forward(Vector2::new(image.width as f32, image.height as f32));
         sx = f32::min(sx, p2.x); sy = f32::min(sy, p2.y);
         ex = f32::max(ex, p2.x); ey = f32::max(ey, p2.y);
 
         // Bottom-Left Corner
-        let p3: Vec2 = cmtx.forward(Vec2::new(0.0, image.height as f32));
+        let p3: Vector2 = cmtx.forward(Vector2::new(0.0, image.height as f32));
         sx = f32::min(sx, p3.x); sy = f32::min(sy, p3.y);
         ex = f32::max(ex, p3.x); ey = f32::max(ey, p3.y);
 
         // Top-Right Corner
-        let p4: Vec2 = cmtx.forward(Vec2::new(image.width as f32, 0.0));
+        let p4: Vector2 = cmtx.forward(Vector2::new(image.width as f32, 0.0));
         sx = f32::min(sx, p4.x); sy = f32::min(sy, p4.y);
         ex = f32::max(ex, p4.x); ey = f32::max(ey, p4.y);
 
@@ -553,7 +553,7 @@ impl Rasterizer {
         for ly in rsy..rey+8 {
             for lx in rsx..rex+8 {
                 // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
-                let ip: Vec2 = cmtx_inv.forward(Vec2::new(lx as f32, ly as f32));
+                let ip: Vector2 = cmtx_inv.forward(Vector2::new(lx as f32, ly as f32));
                 let color: Color = image.pget(ip.x as i32, ip.y as i32);
                 if color.a <= 0 { continue; }
                 self.pset(lx as i32, ly as i32, color);
@@ -589,6 +589,7 @@ impl Rasterizer {
     /// Draws a triangle directly to the screen.
     pub fn ptriangle(&mut self, filled: bool, v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
         if filled {
+
             // Collect pixels from lines without drawing to the screen
             let vl12 = self.cline(v1x, v1y, v2x, v2y);
             let vl13 = self.cline(v1x, v1y, v3x, v3y);
@@ -611,7 +612,7 @@ impl Rasterizer {
             let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
 
             for p in all_pixels {
-                if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1 {
+                if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1{
                     scanline_rows[p.1 as usize].push(p);
                 }
             }
@@ -621,12 +622,193 @@ impl Rasterizer {
                 let height = row[0].1;
                 self.pline(row[0].0, height, row[row.len()-1].0, height, color);
             }
+
+            self.pline(v1x, v1y, v2x, v2y, color);
+            self.pline(v1x, v1y, v3x, v3y, color);
+            self.pline(v2x, v2y, v3x, v3y, color);
         } else {
             self.pline(v1x, v1y, v2x, v2y, color);
             self.pline(v1x, v1y, v3x, v3y, color);
             self.pline(v2x, v2y, v3x, v3y, color);
         }
     }
+
+    pub fn tritex(&mut self, image: &Image, x1: i64, y1: i64, u1: f64, v1: f64, w1: f64,
+        x2: i64, y2: i64, u2: f64, v2: f64, w2: f64,
+        x3: i64, y3: i64, u3: f64, v3: f64, w3: f64)                                        
+    {
+
+            // We need to put all this stuff into local scope so it doesn't break
+            let mut x1: i64 = x1;
+            let mut y1: i64 = y1;
+            let mut u1: f64 = u1;
+            let mut v1: f64 = v1;
+            let mut w1: f64 = w1;
+
+            let mut x2: i64 = x2;
+            let mut y2: i64 = y2;
+            let mut u2: f64 = u2;
+            let mut v2: f64 = v2;
+            let mut w2: f64 = w2;
+
+            let mut x3: i64 = x3;
+            let mut y3: i64 = y3;
+            let mut u3: f64 = u3;
+            let mut v3: f64 = v3;
+            let mut w3: f64 = w3;
+
+
+            if y2 < y1 {
+                std::mem::swap(&mut y1, &mut y2);
+                std::mem::swap(&mut x1, &mut x2);
+                std::mem::swap(&mut u1, &mut u2);
+                std::mem::swap(&mut v1, &mut v2);
+                std::mem::swap(&mut w1, &mut w2);
+            }
+            if y3 < y1 {
+                std::mem::swap(&mut y1, &mut y3);
+                std::mem::swap(&mut x1, &mut x3);
+                std::mem::swap(&mut u1, &mut u3);
+                std::mem::swap(&mut v1, &mut v3);
+                std::mem::swap(&mut w1, &mut w3);
+            }
+            if y3 < y2 {
+                std::mem::swap(&mut y2, &mut y3);
+                std::mem::swap(&mut x2, &mut x3);
+                std::mem::swap(&mut u2, &mut u3);
+                std::mem::swap(&mut v2, &mut v3);
+                std::mem::swap(&mut w2, &mut w3);
+            }
+
+            let mut dy1: i64 = y2 - y1;
+            let mut dx1: i64 = x2 - x1;
+            let mut dv1: f64 = v2 - v1;
+            let mut du1: f64 = u2 - u1;
+            let mut dw1: f64 = w2 - w1;
+            let mut dy2: i64 = y3 - y1;
+            let mut dx2: i64 = x3 - x1;
+            let mut du2: f64 = u3 - u1;
+            let mut dv2: f64 = v3 - v1;
+            let mut dw2: f64 = u3 - u1;
+            let mut sdw2: f64 = w3 - w1;
+
+            let mut tex_u: f64 = 0.0;
+            let mut tex_v: f64 = 0.0;
+            let mut tex_w: f64 = 0.0;
+
+            let mut dax_step: f64 = 0.0;
+            let mut dbx_step: f64 = 0.0;
+            let mut du1_step: f64 = 0.0;
+            let mut dv1_step: f64 = 0.0;
+            let mut du2_step: f64 = 0.0;
+            let mut dv2_step: f64 = 0.0;
+            let mut dw1_step: f64 = 0.0;
+            let mut dw2_step: f64 = 0.0;
+
+            if dy1 > 0 { dax_step = dx1 as f64  / dy1.abs() as f64; }
+            if dy2 > 0 { dbx_step = dx2 as f64  / dy2.abs() as f64; }
+            if dy1 > 0 { du1_step = du1 as f64  / dy1.abs() as f64; }
+            if dy1 > 0 { dv1_step = dv1 as f64  / dy1.abs() as f64; }
+            if dy1 > 0 { dw1_step = dw1 as f64  / dy1.abs() as f64; }
+            if dy2 > 0 { du2_step = du2 as f64  / dy2.abs() as f64; }
+            if dy2 > 0 { dv2_step = dv2 as f64  / dy2.abs() as f64; }
+            if dy2 > 0 { dw2_step = dw2 as f64  / dy2.abs() as f64; }
+             // Drawing top half of triangle
+            if dy1 > 0 {
+                for i in y1..y2 {
+                    let mut ax: i64 = (x1 as f64 + (i - y1) as f64 * dax_step) as i64;
+                    let mut bx: i64 = (x1 as f64 + (i - y1) as f64 * dbx_step) as i64;
+                    let mut tex_su: f64 = u1 as f64 + (i - y1) as f64 * du1_step;
+                    let mut tex_sv: f64 = v1 as f64 + (i - y1) as f64 * dv1_step;
+                    let mut tex_sw: f64 = w1 as f64 + (i - y1) as f64 * dw1_step;
+                    let mut tex_eu: f64 = u1 as f64 + (i - y1) as f64 * du2_step;
+                    let mut tex_ev: f64 = v1 as f64 + (i - y1) as f64 * dv2_step;
+                    let mut tex_ew: f64 = w1 as f64 + (i - y1) as f64 * dw2_step;
+                    if ax > bx {
+                        std::mem::swap(&mut ax, &mut bx);
+                        std::mem::swap(&mut tex_su, &mut tex_eu);
+                        std::mem::swap(&mut tex_sv, &mut tex_ev);
+                        std::mem::swap(&mut tex_sw, &mut tex_ew);
+                    }
+
+                    tex_u = tex_su;
+                    tex_v = tex_sv;
+                    tex_w = tex_sw;
+
+                    let mut tstep: f64 = 1.0 / (bx - ax) as f64;
+                    let mut t: f64 = 0.0;
+                    for j in ax..bx {
+                        tex_u = (1.0 - t) * tex_su + t * tex_eu;
+                        tex_v = (1.0 - t) * tex_sv + t * tex_ev;
+                        tex_w = (1.0 - t) * tex_sw + t * tex_ew;
+                        //if tex_w > self.dget(j, i) {
+                            let px: i32 = (tex_u / tex_w) as i32;
+                            let py: i32 = (tex_v / tex_w) as i32;
+                            let color = image.pget(px, py);
+
+                            self.pset(j as i32, i as i32, color);
+                            //self.dset(j, i, tex_w);
+                        //}
+                        t += tstep;
+                    }
+                }
+            }
+
+            // Drawing bottom half of triangle
+            dy1 = y3 - y2;
+            dx1 = x3 - x2;
+            dv1 = v3 - v2;
+            du1 = u3 - u2;
+            dw1 = w3 - w2;
+            if dy1 > 0 { dax_step = dx1 as f64 / dy1.abs() as f64; }
+            if dy2 > 0 { dbx_step = dx2 as f64 / dy2.abs() as f64; }
+
+            du1_step = 0.0;
+            dv1_step = 0.0;
+
+            if dy1 > 0 { du1_step = du1 / dy1.abs() as f64; }
+            if dy1 > 0 { dv1_step = dv1 / dy1.abs() as f64; }
+            if dy1 > 0 { dw1_step = dw1 / dy1.abs() as f64; }
+            if dy1 > 0 {
+                for i in y2..y3 {
+                    let mut ax: i64 = ((x2 as f64 + (i - y2) as f64) * dax_step) as i64;
+                    let mut bx: i64 = ((x1 as f64 + (i - y1) as f64) * dbx_step) as i64;
+                    let mut tex_su: f64 = u2 + ((i - y2) as f64) * du1_step;
+                    let mut tex_sv: f64 = v2 + ((i - y2) as f64) * dv1_step;
+                    let mut tex_sw: f64 = w2 + ((i - y2) as f64) * dw1_step;
+                    let mut tex_eu: f64 = u1 + ((i - y1) as f64) * du2_step;
+                    let mut tex_ev: f64 = v1 + ((i - y1) as f64) * dv2_step;
+                    let mut tex_ew: f64 = w1 + ((i - y1) as f64) * dw2_step;
+                    if ax > bx {
+                        std::mem::swap(&mut ax, &mut bx);
+                        std::mem::swap(&mut tex_su, &mut tex_eu);
+                        std::mem::swap(&mut tex_sv, &mut tex_ev);
+                        std::mem::swap(&mut tex_sw, &mut tex_ew);
+                    }
+                    tex_u = tex_su;
+                    tex_v = tex_sv;
+                    tex_w = tex_sw;
+                    let mut tstep: f64 = 1.0 / (bx - ax) as f64;
+                    let mut t: f64 = 0.0;
+                    for j in ax..bx {
+                        tex_u = (1.0 - t) * tex_su + t * tex_eu;
+                        tex_v = (1.0 - t) * tex_sv + t * tex_ev;
+                        tex_w = (1.0 - t) * tex_sw + t * tex_ew;
+                        //if tex_w > self.dget(j, i) {
+                            let px: i32 = (tex_u / tex_w) as i32;
+                            let py: i32 = (tex_v / tex_w) as i32;
+                            let color = image.pget(px, py);
+
+                            self.pset(j as i32, i as i32, color);
+                            //self.dset(j, i, tex_w);
+                        //}
+                        t += tstep;
+                    }
+                }
+            }
+    }
+
+
 
     /// Draws a quadratic beizer curve onto the screen.
     pub fn pbeizer(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
