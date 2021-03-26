@@ -167,7 +167,7 @@ fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 /// Multiply incoming pixel with buffer pixel.
 fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
-    let fg = color* rasterizer.tint;
+    let fg = color * rasterizer.tint;
     let bg = Color::new(
         rasterizer.framebuffer.color[idx + 0],
         rasterizer.framebuffer.color[idx + 1],
@@ -320,6 +320,57 @@ impl Rasterizer {
     /// Clears the collected_pixels buffer. Does not resize to zero.
     pub fn cls_collected(&mut self) {
         self.collected_pixels.clear();
+    }
+
+    pub fn blend_rasterizer(&mut self, rasterizer: &mut Rasterizer, opacity: u8) {
+        if opacity == 0 { return; }
+
+        for y in 0..self.framebuffer.height {
+            for x in 0..self.framebuffer.width {
+                let (px, py) = (x as i32, y as i32);
+                self.pset(px, py, rasterizer.pget(px, py));
+            }
+        }
+    }
+
+    pub fn blend_frame_alpha(&mut self, framebuffer: &FrameBuffer, opacity: u8) {
+
+        if opacity == 0 { return; }
+
+        if self.framebuffer.width != framebuffer.width || self.framebuffer.height != framebuffer.height { return; }
+
+        self.framebuffer.color.chunks_exact_mut(4).enumerate().for_each(|(i, c)| {
+            let dst_color = Color::new(c[0], c[1], c[2], c[3]);
+            let src_color = Color::new(framebuffer.color[(i*4) + 0], framebuffer.color[(i*4) + 1], framebuffer.color[(i*4) + 2], framebuffer.color[(i*4) + 3]);
+
+            if src_color.a == 0 { return; }
+
+            let fc = Color::blend_fast(dst_color, src_color, 255 - opacity);
+
+            c[0] = fc.r;
+            c[1] = fc.g;
+            c[2] = fc.b;
+            c[3] = fc.a;
+        });
+    }
+
+    pub fn blend_frame_multiply(&mut self, framebuffer: &FrameBuffer) {
+
+        if self.framebuffer.width != framebuffer.width || self.framebuffer.height != framebuffer.height { return; }
+
+        self.framebuffer.color.chunks_exact_mut(4).enumerate().for_each(|(i, c)| {
+            let dst_color = Color::new(c[0], c[1], c[2], c[3]);
+            let src_color = Color::new(framebuffer.color[(i*4) + 0], framebuffer.color[(i*4) + 1], framebuffer.color[(i*4) + 2], framebuffer.color[(i*4) + 3]);
+
+            if src_color.a == 0 { return; }
+
+            let fc = Color::blend_fast(src_color, dst_color, 255) * dst_color;
+
+            c[0] = fc.r;
+            c[1] = fc.g;
+            c[2] = fc.b;
+            c[3] = fc.a;
+        });
     }
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.

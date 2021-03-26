@@ -19,8 +19,6 @@ crate-type = ["lib"]
 lodepng = "3.2.2" # load pngs for Image to Vec<u8>
 rgb = "0.8.25" # helps the above
 rusttype = "0.9.2" # TTF Rendering into Image
-gltf = "0.15.2"
-vek = "0.14.1"
 
 [dev-dependencies]
 sdl2 = "0.34.3"

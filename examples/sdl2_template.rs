@@ -24,6 +24,9 @@ pub struct TemplateEngine {
 
     pub video_mode: VideoMode,
 
+    pub mouse_x: f32,
+    pub mouse_y: f32,
+
     pub realtime: f32,
     pub timescale: f32,
     pub tics: u64,
@@ -43,6 +46,9 @@ impl TemplateEngine {
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
             video_mode: VideoMode::Fullscreen,
+
+            mouse_x: 0.0,
+            mouse_y: 0.0,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -143,26 +149,15 @@ impl TemplateEngine {
                     Event::Quit {..} => {
                         break 'running
                     },
+                    Event::MouseMotion {xrel, yrel, x, y, ..} => {
+                        self.mouse_x = x as f32;
+                        self.mouse_y = y as f32;
+                    }
                     _ => {}
                 }
             }
 
             let mouse_state = event_pump.mouse_state();
-
-            // Mouse Updating
-            let display_mode = video_subsystem.current_display_mode(0).unwrap();
-            let (window_width, window_height) = canvas.window().size();
-            let screen_width = display_mode.w as f32;
-            let screen_height = display_mode.h as f32;
-
-            mouse_x = mouse_state.x() as f32;
-            mouse_y = mouse_state.y() as f32;
-
-            let mouse_scalar_x = RENDER_WIDTH as f32 / window_width as f32;
-            let mouse_scalar_y = RENDER_HEIGHT as f32 / window_height as f32;
-
-            mouse_x *= mouse_scalar_x;
-            mouse_y *= mouse_scalar_y;
 
             // Print FPS and DT info
             printtime += self.dt_unscaled;
@@ -183,7 +178,7 @@ impl TemplateEngine {
 
             
             // Image Drawing
-            self.rasterizer.pimg(&scotty, mouse_x as i32, mouse_y as i32);
+            self.rasterizer.pimg(&scotty, self.mouse_x as i32, self.mouse_y as i32);
 
             // Image Drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);

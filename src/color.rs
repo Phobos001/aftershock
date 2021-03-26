@@ -49,7 +49,7 @@ impl Color {
 	/// Faster but lest accurate alpha-blending function. Recommended for performance
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
-		if src.a <= 0 { return Color::clear(); }
+		//if src.a <= 0 { return Color::clear(); }
 
 		let alpha: u32 = (src.a - (255 - opacity)) as u32;
 

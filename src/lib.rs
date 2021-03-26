@@ -6,15 +6,19 @@
 #![crate_name = "aftershock"]
 #![crate_type = "lib"]
 
-pub mod three;
+// pub mod three;
 pub mod rasterizer;
 pub mod assets;
 pub mod math;
 pub mod drawables;
 pub mod matrix3;
-pub mod matrix4;
+pub mod line;
 pub mod vector2;
-pub mod vector3;
+pub mod polygon;
 pub mod color;
 pub mod random;
-pub mod quaternion;
+
+
+//pub mod matrix4;
+//pub mod quaternion;
+//pub mod vector3;

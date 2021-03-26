@@ -64,7 +64,6 @@ impl Vector2 {
 	}
 
 	/// Returns the cross product of two 2D vectors.
-	/// You cant really do cross products with 2D vectors but if we pretend its 3D we can still get some use out of the result
 	pub fn cross(v1: Vector2, v2: Vector2) -> f32 {
 		v1.x * v2.y - v1.y * v2.x
 	}
