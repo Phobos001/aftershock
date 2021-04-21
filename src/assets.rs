@@ -87,7 +87,7 @@ impl Image {
 	/// Get a pixel color from the image.
 	pub fn pget(&self, x: i32, y: i32) -> Color {
 		if self.buffer.len() > 0 {
-			let idx: usize = (y * (self.width as i32) + x) as usize * 4;
+			let idx: usize = ((y * (self.width as i32) + x) as usize) * 4;
 
 			let out_left: bool = x < 0;
 			let out_right: bool = x > (self.width) as i32 - 1;

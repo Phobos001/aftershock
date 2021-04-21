@@ -1,13 +1,21 @@
 use crate::math::*;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ThreePointOrientation {
+	CounterClockwise,
+	Colinear,
+	Clockwise,
+}
+
 /// Two-dimensional floating-point Vector to be used as either a position or direction.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vector2 {
 	pub x: f32,
 	pub y: f32,
 }
 
 impl Vector2 {
+
 	pub fn new(x: f32, y: f32) -> Vector2 {
 		Vector2 {
 			x,
@@ -17,8 +25,8 @@ impl Vector2 {
 
 	pub fn zero() -> Vector2 { Vector2 { x: 0.0, y: 0.0, } }
 	pub fn one() -> Vector2 { Vector2 { x: 1.0, y: 1.0, } }
-	pub fn up() -> Vector2 { Vector2 { x: 0.0, y: 1.0, } }
-	pub fn down() -> Vector2 { Vector2 { x: 0.0, y: -1.0, } }
+	pub fn up() -> Vector2 { Vector2 { x: 0.0, y: -1.0, } }
+	pub fn down() -> Vector2 { Vector2 { x: 0.0, y: 1.0, } }
 	pub fn left() -> Vector2 { Vector2 { x: -1.0, y: 0.0, } }
 	pub fn right() -> Vector2 { Vector2 {x: 1.0, y: 0.0, } }
 
@@ -39,23 +47,18 @@ impl Vector2 {
 
 	/// Sets the vectors magintude to 1.0 while retaining its direction.
 	pub fn normalize(&mut self) {
-		let mut magnitude = self.magnitude_sqr();
-		if magnitude > 0.0 {
-			magnitude = magnitude.sqrt();
-			let length_inv = 1.0 / magnitude;
-			self.x *= length_inv;
-			self.y *= length_inv;
-		} else {
-			self.x = 1.0;
-			self.y = 0.0;
-		}
+		let magnitude = self.magnitude();
+		self.x /= magnitude;
+		self.y /= magnitude;
 	}
 
 	/// Returns a normalized copy of the vector.
 	pub fn normalized(&self) -> Vector2 {
-		let mut normalized_vec = self.clone();
-		normalized_vec.normalize();
-		normalized_vec
+		let magnitude = self.magnitude();
+		Vector2::new(
+			self.x / magnitude,
+			self.y / magnitude,
+		)
 	}
 
 	/// Returns the dot product of two 2D vectors.
@@ -73,12 +76,19 @@ impl Vector2 {
 		((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
 	}
 
-	pub fn perpendicular_clockwise(&self) -> Vector2 {
-		Vector2::new(self.y, -self.x)
+	pub fn rotated(&self, radians: f32) -> Vector2 {
+		let cos = radians.cos();
+		let sin = radians.sin();
+		Vector2::new(
+			(cos * self.x) - (sin * self.y),
+			(sin * self.x) + (cos * self.y)
+		)
 	}
 
-	pub fn perpendicular_counterclockwise(&self) -> Vector2 {
-		Vector2::new(-self.y, self.x)
+	/// Get orientation of three points
+	pub fn orientation(v1: Vector2, v2: Vector2, v3: Vector2) -> ThreePointOrientation {
+		let orientation = (v2.y - v1.y) * (v3.x - v2.x) - (v2.x - v1.x) * (v3.y - v2.y);
+		if orientation > 0.0 { ThreePointOrientation::Clockwise } else if orientation < 0.0 { ThreePointOrientation::CounterClockwise} else { ThreePointOrientation::Colinear }
 	}
 
 	pub fn reflect(direction: Vector2, normal: Vector2) -> Vector2 {

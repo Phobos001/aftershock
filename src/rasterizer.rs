@@ -452,6 +452,41 @@ impl Rasterizer {
             if err2 < dy { err += dx; y0 += sy; }
         }
     }
+
+    /// Draws a line using the Bresenham algorithm across two points. This second variation uses thickness
+    pub fn pline2(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, thickness: i32, color: Color) {
+
+        // Create local variables for moving start point
+        let mut x0 = x0;
+        let mut y0 = y0;
+    
+        // Get absolute x/y offset
+        let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
+        let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
+    
+        // Get slopes
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+    
+        // Initialize error
+        let mut err = if dx > dy { dx } else {-dy} / 2;
+        let mut err2;
+    
+        loop {
+            // Set pixel
+            self.pcircle(true, x0, y0, thickness, color);
+    
+            // Check end condition
+            if x0 == x1 && y0 == y1 { break };
+    
+            // Store old error
+            err2 = 2 * err;
+    
+            // Adjust error and start position
+            if err2 > -dx { err -= dy; x0 += sx; }
+            if err2 < dy { err += dx; y0 += sy; }
+        }
+    }
     
     /// Draws a rectangle onto the screen. Can either be filled or outlined.
     pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {

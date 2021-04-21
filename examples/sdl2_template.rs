@@ -7,11 +7,16 @@ use aftershock::assets::*;
 use std::time::Instant;
 
 use sdl2::event::Event;
-
 use sdl2::pixels::{PixelFormatEnum};
+use sdl2::keyboard::Keycode;
 
 const RENDER_WIDTH: usize = 640;
 const RENDER_HEIGHT: usize = 360;
+
+const CONTROL_LEFT: u8   = 0;
+const CONTROL_RIGHT: u8  = 1;
+const CONTROL_UP: u8     = 2;
+const CONTROL_DOWN: u8   = 3;
 
 pub enum VideoMode {
     Exclusive,
@@ -26,6 +31,11 @@ pub struct TemplateEngine {
 
     pub mouse_x: f32,
     pub mouse_y: f32,
+
+    pub actor_position: Vector2,
+
+    pub controls: u8,
+    pub controls_last: u8,
 
     pub realtime: f32,
     pub timescale: f32,
@@ -49,6 +59,11 @@ impl TemplateEngine {
 
             mouse_x: 0.0,
             mouse_y: 0.0,
+
+            actor_position: Vector2::new((RENDER_WIDTH / 2) as f32, (RENDER_HEIGHT / 2) as f32),
+
+            controls: 0,
+            controls_last: 0,
             
             dt: 0.0,
             dt_unscaled: 0.0,
@@ -167,6 +182,24 @@ impl TemplateEngine {
                 printtime = 0.0;
             }
 
+            self.update_controls(&event_pump);
+
+            if (self.is_control_down(CONTROL_LEFT)) {
+                self.actor_position += Vector2::left() * 64.0 * self.dt;
+            }
+            
+            if (self.is_control_down(CONTROL_RIGHT)) {
+                self.actor_position += Vector2::right() * 64.0 * self.dt;
+            }
+
+            if (self.is_control_down(CONTROL_DOWN)) {
+                self.actor_position += Vector2::down() * 64.0 * self.dt;
+            }
+
+            if (self.is_control_down(CONTROL_UP)) {
+                self.actor_position += Vector2::up() * 64.0 * self.dt;
+            }
+
             // == GRAPHICS ==
             self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
 
@@ -188,6 +221,8 @@ impl TemplateEngine {
             self.rasterizer.opacity = 255;
             self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
+            self.rasterizer.prectangle(true, self.actor_position.x as i32, self.actor_position.y as i32, 32, 32, Color::green());
+
             let total_pixels = self.rasterizer.drawn_pixels_since_cls;
             self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
             
@@ -204,6 +239,35 @@ impl TemplateEngine {
         }
 
         return 0;
+    }
+
+    pub fn is_control_down(&mut self, control: u8) -> bool {
+        return self.controls & (1 << control) != 0;
+    }
+
+    pub fn is_control_pressed(&mut self, control: u8) -> bool {
+        !(self.controls_last & (1 << control) != 0) && (self.controls & (1 << control) != 0)
+    }
+
+    pub fn is_control_released(&mut self, control: u8) -> bool {
+        (self.controls_last & (1 << control) != 0) && !(self.controls & (1 << control) != 0)
+    }
+
+    pub fn update_controls(&mut self, event_pump: &sdl2::EventPump) {
+        let keys: Vec<Keycode> = event_pump.keyboard_state().pressed_scancodes().filter_map(Keycode::from_scancode).collect();
+
+        self.controls_last = self.controls;
+        self.controls = 0;
+        
+        for key in keys.iter() {
+            match key {
+                Keycode::W => { self.controls   |= 1 << CONTROL_UP; },
+                Keycode::S => { self.controls   |= 1 << CONTROL_DOWN; },
+                Keycode::A => { self.controls   |= 1 << CONTROL_LEFT; },
+                Keycode::D => { self.controls   |= 1 << CONTROL_RIGHT; },
+                _ => {},
+            }
+        }
     }
 
     pub fn update_times(&mut self) {

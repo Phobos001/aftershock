@@ -11,10 +11,21 @@ impl Polygon {
 		}
 	}
 
-	pub fn new(edges: Vec<Line>) -> Polygon {
+	pub fn new_edges(edges: Vec<Line>) -> Polygon {
 		Polygon { 
 			edges,
 		}
+	}
+
+	pub fn new_points(points: Vec<Vector2>) -> Polygon {
+		let mut edges: Vec<Line> = Vec::new();
+
+		for i in 0..points.len() {
+			let idx = i % points.len();
+			let line = Line::new(points[i], points[(i + 1) % points.len()]);
+		}
+
+		Polygon::new_edges(edges)
 	}
 
 	pub fn point_inside(&self, point: Vector2) -> bool {
