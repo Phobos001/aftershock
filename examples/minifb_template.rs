@@ -4,7 +4,8 @@ use aftershock::rasterizer::*;
 use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
-use aftershock::assets::*;
+use aftershock::image::*;
+use aftershock::font::*;
 
 use std::time::Instant;
 
@@ -102,6 +103,7 @@ impl TemplateEngine {
 
             // Image drawing
             self.rasterizer.pimg(&scotty, 64, 64);
+            
 
             // Image drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);

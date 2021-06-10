@@ -2,7 +2,8 @@ use aftershock::rasterizer::*;
 use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
-use aftershock::assets::*;
+use aftershock::image::*;
+use aftershock::font::*;
 
 use std::time::Instant;
 
@@ -212,6 +213,7 @@ impl TemplateEngine {
             
             // Image Drawing
             self.rasterizer.pimg(&scotty, self.mouse_x as i32, self.mouse_y as i32);
+            
 
             // Image Drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);
@@ -227,7 +229,7 @@ impl TemplateEngine {
             self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
             
             // Present to screen
-            let _ = screentex.update(None, &self.rasterizer.framebuffer.color, (RENDER_WIDTH * 4) as usize);
+            let _ = screentex.update(None, &self.rasterizer.framebuffer.color, (self.rasterizer.framebuffer.width * 4) as usize);
             let _ = canvas.copy(&screentex, None, None);
             canvas.present();
             

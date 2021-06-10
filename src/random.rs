@@ -15,13 +15,13 @@ impl Random {
 	/// Or you can just start at zero and count up.
 	pub fn new(counter: u64, key: usize) -> Random {
 		Random {
-			key,
+			key: key % KEYS_TABLE.len(),
 			counter,
 		}
 	}
 
 	pub fn get_seed_from_time() -> u64 {
-		std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs()
+		std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
 	}
 
 	/// Returns a random 64-bit unsigned integer

@@ -1,6 +1,8 @@
+/// Higher-Level drawing functions to get started with.
 use crate::color::*;
 use crate::vector2::*;
-use crate::assets::*;
+use crate::image::*;
+use crate::font::*;
 use crate::rasterizer::*;
 
 /// Matrix-Transformed image drawing.

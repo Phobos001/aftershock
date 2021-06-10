@@ -1,107 +1,22 @@
 use crate::color::*;
 use crate::vector2::*;
 use crate::matrix3::*;
-use crate::assets::*;
+use crate::image::*;
+use crate::font::*;
 use crate::math::*;
+use crate::framebuffer::*;
 
+// Draw Mode Definition
 pub type PSetOp = fn(&mut Rasterizer, usize, Color);
 
-/// Heap-Allocated Framebuffer.
-#[derive(Debug, Clone)]
-pub struct FrameBuffer {
-    pub width: usize,
-    pub height: usize,
-    pub color: Vec<u8>,
-}
-
-impl FrameBuffer {
-    /// Createds a new framebuffer. Normally created inside a Rasterizer during its initialization
-    pub fn new(width: usize, height: usize) -> FrameBuffer {
-        FrameBuffer {
-            width,
-            height,
-            color: vec![0; width * height * 4],
-        }
-    }
-
-    pub fn to_image(&self) -> Image {
-        Image {
-            buffer: self.color.clone(),
-            width: self.width,
-            height: self.height,
-        }
-    }
-
-    pub fn to_image_buffer(&self, buffer: &mut Vec<u8>) {
-        buffer.clear();
-        if self.color.len() == buffer.len() {
-            buffer.copy_from_slice(self.color.as_slice());
-        }
-    }
-
-
-
-    
-    pub fn blit_framebuffer(&mut self, fbuf_blit: &FrameBuffer, offset_x: usize, offset_y: usize) {
-        let stride = 4;
-        // We blit these directly into the color buffer because otherwise we'd just be drawing everything over again and we don't have to worry about depth
-        
-        // The color array is a 1D row of bytes, so we have to do this in sets of rows
-        // Make sure this actually fits inside the buffer
-        let extent_width: usize = offset_x + fbuf_blit.width;
-        let extent_height: usize = offset_y + fbuf_blit.height;
-    
-        let src_height: usize = fbuf_blit.height;
-        let dst_height: usize = self.height;
-    
-        // If this goes out of bounds at all we should not draw it
-        let not_too_big: bool = self.width * self.height < fbuf_blit.width * self.height;
-        let not_out_of_bounds: bool = extent_width > self.width || extent_height > self.height;
-        if not_too_big && not_out_of_bounds { 
-            println!("ERROR - FRAMEBUFFER BLIT: Does not fit inside target buffer!"); 
-            return;
-        }
-    
-        // Lets get an array of rows so we can blit them directly into the color buffer
-        let mut rows_src: Vec<&[u8]> = Vec::new();
-    
-        // Build a list of rows to blit to the screen.
-        fbuf_blit.color.chunks_exact(fbuf_blit.width * stride).enumerate().for_each(|(_, row)| {
-            rows_src.push(row);
-        });
-    
-        let is_equal_size: bool = self.width == fbuf_blit.width && self.height == fbuf_blit.height;
-    
-        // Goes through each row of fbuf and split it twice into the slice that fits our rows_src. So we 
-        self.color.chunks_exact_mut(self.width * stride).enumerate().for_each(|(i, row_dst)| {
-            if i >= dst_height { return; }
-            if i >= offset_y && i < offset_y + src_height { 
-                if is_equal_size {
-                    row_dst.clone_from_slice(rows_src[i]);
-                } else {
-                    // We need to cut the row into a section that we can just set equal to our row
-                    // Make sure that we are actually in the bounds from our source buffer
-                    if i >= offset_y && i < (offset_y + rows_src.len()) {
-                        // [......|#######]
-                        // Split at the stride distance to get the first end
-                        let rightsect = row_dst.split_at_mut(offset_x * stride).1;
-        
-                        // [......|####|...]
-                        // Get the second half but left
-                        let section = rightsect.split_at_mut((extent_width - offset_x) * stride).0;
-        
-                        // I HAVE YOU NOW
-                        section.copy_from_slice(rows_src[i-offset_y]);
-                    }
-                }
-            }
-        });
-    }
-}
+// Calls functions in other structures with each pixel drawn. Good for 
+pub type OuterOp = fn(i32, i32, Color);
 
 /// Controls how a rasterizer should draw incoming pixels.
 #[derive(Debug, Clone, Copy)]
 pub enum DrawMode {
+    NoOp,
+    NoAlpha,
     Opaque,
     Alpha,
     Addition,
@@ -110,7 +25,20 @@ pub enum DrawMode {
     Divide,
     InvertedAlpha,
     InvertedOpaque,
-    Collect,
+    // Collect,
+}
+
+fn pset_noop(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+fn pset_noalpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    let color = color * rasterizer.tint;
+    rasterizer.framebuffer.color[idx + 0] = color.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = color.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = color.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = color.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
 }
 
 /// Draw pixels if they are fully opaque, otherwise ignore them.
@@ -135,7 +63,11 @@ fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_fast(fg, bg, rasterizer.opacity);
+    let c = if rasterizer.use_fast_alpha_blend {
+        Color::blend_fast(fg, bg, rasterizer.opacity)
+    } else {
+        Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0)
+    };
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -155,7 +87,11 @@ fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_fast(fg, bg, rasterizer.opacity) + bg;
+    let c = if rasterizer.use_fast_alpha_blend {
+        Color::blend_fast(fg, bg, rasterizer.opacity) + bg
+    } else {
+        Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0) + bg
+    };
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -175,7 +111,11 @@ fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_fast(fg, bg, rasterizer.opacity) * bg;
+    let c = if rasterizer.use_fast_alpha_blend {
+        Color::blend_fast(fg.inverted(), bg, rasterizer.opacity) * bg
+    } else {
+        Color::blend(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0) * bg
+    };
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -195,7 +135,12 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity);
+    let c = if rasterizer.use_fast_alpha_blend {
+        Color::blend_fast(fg.inverted(), bg, rasterizer.opacity)
+    } else {
+        Color::blend(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0)
+    };
+    
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -216,7 +161,7 @@ fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.drawn_pixels_since_cls += 1;
 }
 
-/// Collect drawn pixels into collected_pixels instead of drawing them to the buffer.
+/* /// Collect drawn pixels into collected_pixels instead of drawing them to the buffer.
 /// This is useful for more advanced graphical effects, for example using a series of ptriangle's to
 /// build a polygonal area, then drawing a texture onto the pixels.
 fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
@@ -224,9 +169,10 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     let x = modi(idx_unstrided as i32, rasterizer.framebuffer.width as i32);
     let y = idx_unstrided as i32 / rasterizer.framebuffer.width as i32;
     rasterizer.collected_pixels.push((x, y, color));
-}
+} */
 
 /// Drawing switchboard that draws directly into a framebuffer. Drawing options like Tint and Opacity must be manually changed by the user.
+#[derive(Clone)]
 pub struct Rasterizer {
     pset_op: PSetOp,
     
@@ -238,7 +184,7 @@ pub struct Rasterizer {
     pub wrapping: bool,
     pub use_fast_alpha_blend: bool,
 
-    pub collected_pixels: Vec<(i32, i32, Color)>,
+    //pub collected_pixels: Vec<(i32, i32, Color)>,
 
     pub camera_x: i32,
     pub camera_y: i32,
@@ -265,7 +211,7 @@ impl Rasterizer {
             wrapping: false,
             use_fast_alpha_blend: true,
 
-            collected_pixels: Vec::new(),
+            //collected_pixels: Vec::new(),
 
             camera_x: 0,
             camera_y: 0,
@@ -274,18 +220,25 @@ impl Rasterizer {
         }
     }
 
+    /// Clears the framebuffer and changes its width and height to new values.
+    pub fn resize_framebuffer(&mut self, width: usize, height: usize) {
+        self.framebuffer = FrameBuffer::new(width, height);
+    }
+
     /// Sets the rasterizers drawing mode for incoming pixels. Should be defined before every drawing operation.
     /// # Arguments
     /// * 'mode' - Which drawing function should the Rasterizer use.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
+            DrawMode::NoOp => { self.pset_op = pset_noop;}
+            DrawMode::NoAlpha => {self.pset_op = pset_noalpha;}
             DrawMode::Opaque => {self.pset_op = pset_opaque;},
             DrawMode::Alpha => {self.pset_op = pset_alpha;},
             DrawMode::Addition => {self.pset_op = pset_addition;},
             DrawMode::Multiply => {self.pset_op = pset_multiply;}
             DrawMode::InvertedAlpha => {self.pset_op = pset_inverted_alpha;}
             DrawMode::InvertedOpaque => {self.pset_op = pset_inverted_opaque;}
-            DrawMode::Collect => {self.pset_op = pset_collect;}
+            //DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
         }
     }
@@ -317,10 +270,10 @@ impl Rasterizer {
         self.drawn_pixels_since_cls = 0;
     }
 
-    /// Clears the collected_pixels buffer. Does not resize to zero.
+    /* /// Clears the collected_pixels buffer. Does not resize to zero.
     pub fn cls_collected(&mut self) {
         self.collected_pixels.clear();
-    }
+    } */
 
     pub fn blend_rasterizer(&mut self, rasterizer: &mut Rasterizer, opacity: u8) {
         if opacity == 0 { return; }
@@ -719,7 +672,8 @@ impl Rasterizer {
         }
     }
 
-    pub fn tritex(&mut self, image: &Image, x1: i64, y1: i64, u1: f64, v1: f64, w1: f64,
+    /// Untested but comes from OneLoneCoders 3D Software Rendering series. Some help would be wonderful, I'm still very confused.
+    pub fn ptritex(&mut self, image: &Image, x1: i64, y1: i64, u1: f64, v1: f64, w1: f64,
         x2: i64, y2: i64, u2: f64, v2: f64, w2: f64,
         x3: i64, y3: i64, u3: f64, v3: f64, w3: f64)                                        
     {
@@ -894,10 +848,8 @@ impl Rasterizer {
             }
     }
 
-
-
     /// Draws a quadratic beizer curve onto the screen.
-    pub fn pbeizer(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
+    pub fn pbeizer(&mut self, thickness: i32, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
         let mut step: f32 = 0.0;
 
         // Get the maximal number of pixels we will need to use and get its inverse as a step size.
@@ -923,7 +875,7 @@ impl Rasterizer {
             let px1 = lerpf(px0, x1, step);
             let py1 = lerpf(py0, y1, step);
 
-            self.pset(px1 as i32, py1 as i32, color);
+            self.pcircle(true, px1 as i32, py1 as i32, thickness, color);
             step += stride;
         }
     }

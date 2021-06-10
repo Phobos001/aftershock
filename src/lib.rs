@@ -6,18 +6,36 @@
 #![crate_name = "aftershock"]
 #![crate_type = "lib"]
 
-// pub mod three;
+// Core
+pub mod framebuffer;
 pub mod rasterizer;
-pub mod assets;
+
+// Assets
+
+pub mod image;
+pub mod font;
+
+// Utilities
 pub mod math;
 pub mod drawables;
 pub mod matrix3;
-pub mod line;
+
 pub mod vector2;
-pub mod polygon;
+
 pub mod color;
 pub mod random;
 
-//pub mod matrix4;
-//pub mod quaternion;
-//pub mod vector3;
+
+pub mod line;
+#[cfg(feature = "unfinished")]
+pub mod polygon;
+#[cfg(feature = "unfinished")]
+pub mod three;
+#[cfg(feature = "unfinished")]
+pub mod matrix4;
+#[cfg(feature = "unfinished")]
+pub mod quaternion;
+#[cfg(feature = "unfinished")]
+pub mod vector3;
+#[cfg(feature = "unfinished")]
+pub mod rasterizer_threaded;
