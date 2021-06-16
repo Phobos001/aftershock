@@ -444,7 +444,7 @@ impl Rasterizer {
     /// Draws a rectangle onto the screen. Can either be filled or outlined.
     pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
         let x0 = x;
-        let x1 = x + w;
+        let x1 = x + (w-1);
         let y0 = y;
         let y1 = y + h;
     

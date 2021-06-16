@@ -1,9 +1,9 @@
 use aftershock::rasterizer::*;
-use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::image::*;
 use aftershock::font::*;
+use aftershock::vector2::*;
 
 use std::time::Instant;
 
@@ -29,6 +29,7 @@ pub struct TemplateEngine {
     pub rasterizer: Rasterizer,
 
     pub video_mode: VideoMode,
+    pub stretch_fill: bool,
 
     pub mouse_x: f32,
     pub mouse_y: f32,
@@ -57,6 +58,7 @@ impl TemplateEngine {
             rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
 
             video_mode: VideoMode::Fullscreen,
+            stretch_fill: false,
 
             mouse_x: 0.0,
             mouse_y: 0.0,
@@ -122,7 +124,10 @@ impl TemplateEngine {
             }
         };
 
-        let _ = canvas.set_logical_size(RENDER_WIDTH as u32, RENDER_HEIGHT as u32);
+        if !self.stretch_fill {
+            let _ = canvas.set_logical_size(RENDER_WIDTH as u32, RENDER_HEIGHT as u32);
+        }
+        
         let texture_creator = canvas.texture_creator();
 
         // This is what we update our buffers to
@@ -185,20 +190,20 @@ impl TemplateEngine {
 
             self.update_controls(&event_pump);
 
-            if (self.is_control_down(CONTROL_LEFT)) {
-                self.actor_position += Vector2::left() * 64.0 * self.dt;
+            if self.is_control_down(CONTROL_LEFT) {
+                self.actor_position += Vector2::new(-1.0, 0.0) * 64.0 * self.dt;
             }
             
-            if (self.is_control_down(CONTROL_RIGHT)) {
-                self.actor_position += Vector2::right() * 64.0 * self.dt;
+            if self.is_control_down(CONTROL_RIGHT) {
+                self.actor_position += Vector2::new(1.0, 0.0) * 64.0 * self.dt;
             }
 
-            if (self.is_control_down(CONTROL_DOWN)) {
-                self.actor_position += Vector2::down() * 64.0 * self.dt;
+            if self.is_control_down(CONTROL_DOWN) {
+                self.actor_position += Vector2::new(0.0, 1.0) * 64.0 * self.dt;
             }
 
-            if (self.is_control_down(CONTROL_UP)) {
-                self.actor_position += Vector2::up() * 64.0 * self.dt;
+            if self.is_control_down(CONTROL_UP) {
+                self.actor_position += Vector2::new(0.0, -1.0) * 64.0 * self.dt;
             }
 
             // == GRAPHICS ==
@@ -218,8 +223,10 @@ impl TemplateEngine {
             // Image Drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);
             self.rasterizer.opacity = 128;
+            //
             self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
             self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
+            
             self.rasterizer.opacity = 255;
             self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
@@ -300,6 +307,7 @@ pub fn main() {
             "--fullscreen" => { engine.video_mode = VideoMode::Fullscreen; },
             "--windowed" => { engine.video_mode = VideoMode::Windowed; },
             "--software-canvas" => { hardware_accelerated = false; }
+            "--stretch-fill" => { engine.stretch_fill = true; }
             _ => {}
         }
     }

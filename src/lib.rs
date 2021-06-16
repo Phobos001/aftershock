@@ -18,24 +18,9 @@ pub mod font;
 // Utilities
 pub mod math;
 pub mod drawables;
-pub mod matrix3;
-
-pub mod vector2;
-
 pub mod color;
 pub mod random;
 
-
-pub mod line;
-#[cfg(feature = "unfinished")]
-pub mod polygon;
-#[cfg(feature = "unfinished")]
-pub mod three;
-#[cfg(feature = "unfinished")]
-pub mod matrix4;
-#[cfg(feature = "unfinished")]
-pub mod quaternion;
-#[cfg(feature = "unfinished")]
-pub mod vector3;
-#[cfg(feature = "unfinished")]
-pub mod rasterizer_threaded;
+// Math
+pub mod vector2;
+pub mod matrix3;
