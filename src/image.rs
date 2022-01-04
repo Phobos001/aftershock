@@ -9,6 +9,8 @@ pub struct Image {
 	pub buffer: Vec<u8>,
 	pub width: usize,
 	pub height: usize,
+
+	pub is_error: bool,
 }
 
 impl Image {
@@ -18,6 +20,7 @@ impl Image {
 			buffer: Vec::new(),
 			width: 1,
 			height: 1,
+			is_error: true,
 		};
 
 		// Blank pixel (RGBA 4 Bytes)
@@ -33,6 +36,7 @@ impl Image {
 			buffer: vec![0; width * height * 4],
 			width,
 			height,
+			is_error: false,
 		}
 	}
 
@@ -47,10 +51,11 @@ impl Image {
 					buffer: buffer_new,
 					width: image.width,
 					height: image.height,
+					is_error: false
 				}
 			},
 			Err(reason) => {
-				println!("ASERROR - IMAGE: Could not load | {}", reason);
+				println!("ERROR - IMAGE: Could not load {} | {}", path_to, reason);
 				return Image::default();
 			}
 		};
@@ -74,8 +79,6 @@ impl Image {
 			self.buffer[idx + 2] = color.b;  // B
 			self.buffer[idx + 3] = color.a;  // A
 			
-		} else {
-			println!("ASERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
 		}
 	}
 
@@ -99,7 +102,6 @@ impl Image {
 				self.buffer[idx + 3]
 			);
 		} else {
-			println!("ASERROR - IMAGE: Buffer is not initialized. Did you remember to use load()?");
 			Color::black()
 		}
 	}

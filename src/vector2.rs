@@ -85,6 +85,10 @@ impl Vector2 {
 		)
 	}
 
+	pub fn slide(direction: Vector2, normal: Vector2) -> Vector2 {
+		direction - (normal * Vector2::dot(direction, normal))
+	}
+
 	/// Get orientation of three points
 	pub fn orientation(v1: Vector2, v2: Vector2, v3: Vector2) -> ThreePointOrientation {
 		let orientation = (v2.y - v1.y) * (v3.x - v2.x) - (v2.x - v1.x) * (v3.y - v2.y);
@@ -100,6 +104,10 @@ impl Vector2 {
 			x: lerpf(v1.x, v2.x, t),
 			y: lerpf(v1.y, v2.y, t),
 		}
+	}
+
+	pub fn inverse(&self) -> Vector2 {
+		Vector2::new(1.0 / self.x, 1.0 / self.y)
 	}
 }
 

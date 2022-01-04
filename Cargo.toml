@@ -1,6 +1,6 @@
 [package]
 name    = "aftershock"
-version = "0.0.13"
+version = "0.0.14"
 authors = ["Keinan Powers / Phobos001"]
 edition = "2018"
 catagories = "graphics"
@@ -19,11 +19,11 @@ crate-type = ["lib"]
 lodepng = "3.2.2" # load pngs for Image to Vec<u8>
 rgb = "0.8.25" # helps the above
 rusttype = "0.9.2" # TTF Rendering into Image
-vek = "0.15.1"
 
 [dev-dependencies]
-sdl2 = "0.34.3"
-minifb = "0.19.1"
+sdl2 = "0.35.0"
+minifb = "0.20.0"
+framebuffer = "0.3.0"
 
 [profile.release]
 opt-level = 3

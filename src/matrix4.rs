@@ -1,4 +1,4 @@
-use crate::{quaternion::Quaternion, vector3::*};
+use crate::vector3::*;
 use crate::three::*;
 
 // Matrix 4x4 for 3D transformations

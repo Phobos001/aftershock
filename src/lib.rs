@@ -21,6 +21,13 @@ pub mod drawables;
 pub mod color;
 pub mod random;
 
-// Math
+// Math 2D
 pub mod vector2;
 pub mod matrix3;
+
+// Math 3D
+pub mod matrix4;
+pub mod vector3;
+
+// 3D Utilities
+pub mod three;

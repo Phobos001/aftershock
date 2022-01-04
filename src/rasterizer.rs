@@ -19,6 +19,7 @@ pub enum DrawMode {
     NoAlpha,
     Opaque,
     Alpha,
+    AlphaFast,
     Addition,
     Subtraction,
     Multiply,
@@ -63,11 +64,27 @@ fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = if rasterizer.use_fast_alpha_blend {
-        Color::blend_fast(fg, bg, rasterizer.opacity)
-    } else {
-        Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0)
-    };
+    let c = Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0);
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+/// Draw pixels and blend them with the background based on the alpha channel
+fn pset_alpha_fast(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    
+    let fg = color * rasterizer.tint;
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_fast(fg, bg, rasterizer.opacity);
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -175,19 +192,18 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 #[derive(Clone)]
 pub struct Rasterizer {
     pset_op: PSetOp,
+    pub interlacing_on_even_lines: bool,
     
     pub framebuffer: FrameBuffer,
 
     pub draw_mode: DrawMode,
     pub tint: Color,
     pub opacity: u8,
-    pub wrapping: bool,
+    pub interlacing: bool,
     pub use_fast_alpha_blend: bool,
 
-    //pub collected_pixels: Vec<(i32, i32, Color)>,
+    pub camera: Vector2,
 
-    pub camera_x: i32,
-    pub camera_y: i32,
     pub drawn_pixels_since_cls: u64,
     pub time_since_cls: std::time::Duration,
 }
@@ -203,18 +219,18 @@ impl Rasterizer {
         //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
+            interlacing_on_even_lines: false, 
+
             framebuffer: FrameBuffer::new(width, height),
 
             draw_mode: DrawMode::Opaque,
             tint: Color::white(),
             opacity: 255,
-            wrapping: false,
+            interlacing: false,
             use_fast_alpha_blend: true,
 
-            //collected_pixels: Vec::new(),
+            camera: Vector2::zero(),
 
-            camera_x: 0,
-            camera_y: 0,
             drawn_pixels_since_cls: 0,
             time_since_cls: std::time::Duration::new(0, 0),
         }
@@ -230,24 +246,17 @@ impl Rasterizer {
     /// * 'mode' - Which drawing function should the Rasterizer use.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
-            DrawMode::NoOp => { self.pset_op = pset_noop;}
-            DrawMode::NoAlpha => {self.pset_op = pset_noalpha;}
-            DrawMode::Opaque => {self.pset_op = pset_opaque;},
-            DrawMode::Alpha => {self.pset_op = pset_alpha;},
-            DrawMode::Addition => {self.pset_op = pset_addition;},
-            DrawMode::Multiply => {self.pset_op = pset_multiply;}
-            DrawMode::InvertedAlpha => {self.pset_op = pset_inverted_alpha;}
-            DrawMode::InvertedOpaque => {self.pset_op = pset_inverted_opaque;}
+            DrawMode::NoOp              => {self.pset_op = pset_noop;}
+            DrawMode::NoAlpha           => {self.pset_op = pset_noalpha;}
+            DrawMode::Opaque            => {self.pset_op = pset_opaque;},
+            DrawMode::Alpha             => {self.pset_op = pset_alpha;},
+            DrawMode::AlphaFast         => {self.pset_op = pset_alpha_fast;},
+            DrawMode::Addition          => {self.pset_op = pset_addition;},
+            DrawMode::Multiply          => {self.pset_op = pset_multiply;}
+            DrawMode::InvertedAlpha     => {self.pset_op = pset_inverted_alpha;}
+            DrawMode::InvertedOpaque    => {self.pset_op = pset_inverted_opaque;}
             //DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
-        }
-    }
-
-    fn blend_color(&mut self, src: Color, dst: Color) -> Color {
-        if self.use_fast_alpha_blend {
-            Color::blend_fast(src, dst, self.opacity)
-        } else {
-            Color::blend(src, dst, self.opacity as f32 / 255.0)
         }
     }
 
@@ -269,11 +278,6 @@ impl Rasterizer {
         });
         self.drawn_pixels_since_cls = 0;
     }
-
-    /* /// Clears the collected_pixels buffer. Does not resize to zero.
-    pub fn cls_collected(&mut self) {
-        self.collected_pixels.clear();
-    } */
 
     pub fn blend_rasterizer(&mut self, rasterizer: &mut Rasterizer, opacity: u8) {
         if opacity == 0 { return; }
@@ -328,24 +332,25 @@ impl Rasterizer {
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
-        let mut x = -self.camera_x as i32 + x;
-        let mut y = -self.camera_y as i32 + y;
 
-        let mut idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
-        if !self.wrapping {
-            let out_left: bool = x < 0;
-            let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
-            let out_top: bool = y < 0;
-            let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
-            let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
+        let x = x - f32::round(self.camera.x) as i32;
+        let y = y - f32::round(self.camera.y) as i32;
 
-            if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
-        } else {
-            x = modi(x, self.framebuffer.width as i32);
-            y = modi(y, self.framebuffer.height as i32);
-            idx = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
-            if idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1 { return; }
+        let is_line_even: bool = y % 2 == 0;
+
+        if self.interlacing {
+            if (self.interlacing_on_even_lines && !is_line_even) || (!self.interlacing_on_even_lines && is_line_even) { return; }
         }
+
+        let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+
+        let out_left: bool = x < 0;
+        let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
+        let out_top: bool = y < 0;
+        let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
+        let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
+
+        if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
         
         // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
         (self.pset_op)(self, idx, color);
@@ -426,7 +431,7 @@ impl Rasterizer {
         let mut err2;
     
         loop {
-            // Set pixel
+            // Set pixel, but as a circle
             self.pcircle(true, x0, y0, thickness, color);
     
             // Check end condition
@@ -539,7 +544,11 @@ impl Rasterizer {
     }
 
     /// Draws a rotated and scaled image to the screen using matrix multiplication.
-    pub fn pimgmtx(&mut self, image: &Image, position: Vector2, rotation: f32, scale: Vector2, offset: Vector2) {
+    pub fn pimgmtx(&mut self, image: &Image, position_x: f32, position_y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
+        let position: Vector2 = Vector2::new(position_x, position_y);
+        let offset: Vector2 = Vector2::new(offset_x, offset_y);
+        let scale: Vector2 = Vector2::new(scale_x, scale_y);
+
         let mtx_o = Matrix3::translated(offset);
         let mtx_r = Matrix3::rotated(rotation);
         let mtx_p = Matrix3::translated(position);
@@ -588,12 +597,13 @@ impl Rasterizer {
         let cmtx_inv = cmtx.clone().inv();
 
 		// We can finally draw!
-		// Noticed some weird clipping on the right side of sprites, like the BB isn't big enough? Just gonna add some more pixels down and right just in case
-        for ly in rsy..rey+8 {
-            for lx in rsx..rex+8 {
+		// An added 8 pixel boundry is created due to a bug(?) that clips the image drawing too early depending on rotation.
+        for ly in rsy-8..rey+8 {
+            for lx in rsx-8..rex+8 {
                 // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
                 let ip: Vector2 = cmtx_inv.forward(Vector2::new(lx as f32, ly as f32));
                 let color: Color = image.pget(ip.x as i32, ip.y as i32);
+                // We skip drawing entirely if the alpha is zero.
                 if color.a <= 0 { continue; }
                 self.pset(lx as i32, ly as i32, color);
             }
@@ -645,9 +655,6 @@ impl Rasterizer {
                 all_pixels.push(p3);
             }
 
-            // Sort by row
-            all_pixels.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
             let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
 
             for p in all_pixels {
@@ -662,6 +669,7 @@ impl Rasterizer {
                 self.pline(row[0].0, height, row[row.len()-1].0, height, color);
             }
 
+            // Draw edges
             self.pline(v1x, v1y, v2x, v2y, color);
             self.pline(v1x, v1y, v3x, v3y, color);
             self.pline(v2x, v2y, v3x, v3y, color);
@@ -672,7 +680,46 @@ impl Rasterizer {
         }
     }
 
-    /// Untested but comes from OneLoneCoders 3D Software Rendering series. Some help would be wonderful, I'm still very confused.
+    pub fn ptritex(&mut self, image: &Image, x1: i32, y1: i32, u1: f32, v1: f32, w1: f32,
+        x2: i32, y2: i32, u2: f32, v2: f32, w2: f32,
+        x3: i32, y3: i32, u3: f32, v3: f32, w3: f32) {
+        // Collect pixels from lines without drawing to the screen
+        let vl12 = self.cline(x1, y1, x2, y2);
+        let vl13 = self.cline(x1, y1, x3, y3);
+        let vl23 = self.cline(x2, y2, x3, y3);
+
+        let mut all_pixels: Vec<(i32, i32)> = Vec::new();
+        for p1 in vl12 {
+            all_pixels.push(p1);
+        }
+        for p2 in vl13 {
+            all_pixels.push(p2)
+        }
+        for p3 in vl23 {
+            all_pixels.push(p3);
+        }
+
+        let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
+
+        for p in &all_pixels {
+            if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1{
+                scanline_rows[p.1 as usize].push(*p);
+            }
+        }
+
+        for row in scanline_rows {
+            if row.len() == 0 { continue; }
+            let height = row[0].1;
+
+            for pxh in (row[0].0)..(row[row.len()-1].0) {
+                all_pixels.push((pxh, height));
+            }
+
+            
+        }
+    }
+
+    /* /// Untested but comes from OneLoneCoders 3D Software Rendering series. Some help would be wonderful, I'm still very confused.
     pub fn ptritex(&mut self, image: &Image, x1: i64, y1: i64, u1: f64, v1: f64, w1: f64,
         x2: i64, y2: i64, u2: f64, v2: f64, w2: f64,
         x3: i64, y3: i64, u3: f64, v3: f64, w3: f64)                                        
@@ -846,7 +893,7 @@ impl Rasterizer {
                     }
                 }
             }
-    }
+    } */
 
     /// Draws a quadratic beizer curve onto the screen.
     pub fn pbeizer(&mut self, thickness: i32, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {

@@ -45,3 +45,29 @@ pub fn rotate2(x: f32, y: f32, a: f32) -> (f32, f32) {
 	let ay = (x * asin) + (y * acos);
 	return (ax, ay);
 }
+
+pub fn dot2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
+	x0 * x1 + y0 * y1
+}
+
+pub fn cross2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
+	(x0 * y1) - (y0 * x1)
+}
+
+pub fn barycentric2(v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> (f32, f32, f32) {
+	let b0 = (v2x - v1x, v2y - v1y);
+	let b1 = (v3x - v1x, v3y - v1y);
+	let b2 = (v1x - v2x, v1y - v2y);
+
+    let d00 = dot2(b0.0, b0.1, b0.0, b0.1);
+    let d01 = dot2(b0.0, b0.1, b1.0, b1.1);
+    let d11 = dot2(b1.0, b1.1, b1.0, b1.1);
+    let d20 = dot2(b2.0, b2.1, b0.0, b0.1);
+    let d21 = dot2(b2.0, b2.1, b1.0, b1.1);
+    let denom = d00 * d11 - d01 * d01;
+   	let bv = (d11 * d20 - d01 * d21) / denom;
+    let bw = (d00 * d21 - d01 * d20) / denom;
+	let bu = 1.0 - bv - bw;
+	
+	(bu, bv, bw)
+}

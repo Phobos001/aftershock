@@ -35,7 +35,7 @@ impl<'a> Sprite<'a> {
 	pub fn draw(&self, rasterizer: &mut Rasterizer) {
         rasterizer.tint = self.tint;
         rasterizer.opacity = self.opacity;
-        rasterizer.pimgmtx(self.image, self.position, self.rotation, self.scale, self.offset);
+        rasterizer.pimgmtx(self.image, self.position.x, self.position.y, self.rotation, self.scale.x, self.scale.y, self.offset.x, self.offset.y);
         rasterizer.opacity = 255;
         rasterizer.tint = Color::white();
 	}
@@ -113,13 +113,14 @@ impl SpriteFont {
             rasterizer.set_draw_mode(DrawMode::Alpha);
             for j in 0..self.glyphs.len() {
                 if self.glyphs[j].glyph == chars[i] {
+                    let newpos: Vector2 = self.position + Vector2::new(jumpx, jumpy);
                     
                     rasterizer.tint = self.tint;
                     rasterizer.opacity = self.opacity;
-                    rasterizer.pimgmtx(&self.glyphs[j].image, self.position + Vector2::new(jumpx, jumpy),
+                    rasterizer.pimgmtx(&self.glyphs[j].image, newpos.x, newpos.y,
                         self.rotation,
-                        self.scale,
-                        self.offset);
+                        self.scale.x, self.scale.y,
+                        self.offset.x, self.offset.y);
                     
                     rasterizer.tint = Color::white();
                     rasterizer.opacity = 255;

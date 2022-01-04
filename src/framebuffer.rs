@@ -24,6 +24,7 @@ impl FrameBuffer {
             buffer: self.color.clone(),
             width: self.width,
             height: self.height,
+            is_error: false,
         }
     }
 

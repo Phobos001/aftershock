@@ -1,8 +1,6 @@
-extern crate gltf;
+use crate::{matrix4::*, color::*, vector2::*, vector3::*, rasterizer::*};
 
-use crate::{matrix4::*, color::*, vector2::*, vector3::*, rasterizer::*, quaternion::*};
-
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Triangle {
@@ -18,7 +16,7 @@ pub struct MeshRenderer {
 	pub position: Vector3,
 	pub rotation: Vector3,
 	pub scale: Vector3,
-	pub mesh: Rc<Mesh>,
+	pub mesh: Arc<Mesh>,
 }
 
 
@@ -144,7 +142,7 @@ impl Mesh {
 
 impl MeshRenderer {
 
-	pub fn new(mesh: Rc<Mesh>) -> MeshRenderer {
+	pub fn new(mesh: Arc<Mesh>) -> MeshRenderer {
 		MeshRenderer {
 			position: Vector3::zero(),
 			rotation: Vector3::zero(),

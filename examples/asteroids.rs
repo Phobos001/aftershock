@@ -1,5 +1,7 @@
 // ECS would be perfect for this but I'm trying to keep things simple.
 
+// !!! Wrapping was removed from Aftershock on 12/13/2021 due to a noticable decrease in performance from branching
+
 use aftershock::rasterizer::*;
 use aftershock::vector2::*;
 use aftershock::matrix3::*;
@@ -8,7 +10,7 @@ use aftershock::color::*;
 use aftershock::drawables::*;
 use aftershock::random::*;
 
-use std::{thread::spawn, time::Instant};
+use std::time::Instant;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -420,21 +422,21 @@ impl AsteroidsEngine {
         
         for key in keys.iter() {
             match key {
-                Keycode::Left => { self.controls     |= 1 << CONTROL_ROTATE_LEFT; },
-                Keycode::Right => { self.controls    |= 1 << CONTROL_ROTATE_RIGHT; },
-                Keycode::Up => { self.controls       |= 1 << CONTROL_THRUST_FORWARD; },
-                Keycode::Down => { self.controls     |= 1 << CONTROL_THRUST_BACKWARD; },
+                Keycode::Left   => { self.controls  |= 1 << CONTROL_ROTATE_LEFT; },
+                Keycode::Right  => { self.controls  |= 1 << CONTROL_ROTATE_RIGHT; },
+                Keycode::Up     => { self.controls  |= 1 << CONTROL_THRUST_FORWARD; },
+                Keycode::Down   => { self.controls  |= 1 << CONTROL_THRUST_BACKWARD; },
 
                 // WASD Alternative
-                Keycode::A => { self.controls     |= 1 << CONTROL_ROTATE_LEFT; },
-                Keycode::D => { self.controls    |= 1 << CONTROL_ROTATE_RIGHT; },
-                Keycode::W => { self.controls       |= 1 << CONTROL_THRUST_FORWARD; },
-                Keycode::S => { self.controls     |= 1 << CONTROL_THRUST_BACKWARD; },
+                Keycode::A      => { self.controls  |= 1 << CONTROL_ROTATE_LEFT; },
+                Keycode::D      => { self.controls  |= 1 << CONTROL_ROTATE_RIGHT; },
+                Keycode::W      => { self.controls  |= 1 << CONTROL_THRUST_FORWARD; },
+                Keycode::S      => { self.controls  |= 1 << CONTROL_THRUST_BACKWARD; },
 
-                Keycode::Space => { self.controls    |= 1 << CONTROL_FIRE; },
-                Keycode::Escape => { self.controls   |= 1 << CONTROL_PAUSE; },
-                Keycode::F1 => { self.controls       |= 1 << CONTROL_DEBUG_COLLISION; },
-                Keycode::F2 => { self.controls       |= 1 << CONTROL_DEBUG_INFO; },
+                Keycode::Space  => { self.controls  |= 1 << CONTROL_FIRE; },
+                Keycode::Escape => { self.controls  |= 1 << CONTROL_PAUSE; },
+                Keycode::F1     => { self.controls  |= 1 << CONTROL_DEBUG_COLLISION; },
+                Keycode::F2     => { self.controls  |= 1 << CONTROL_DEBUG_INFO; },
                 _ => {},
             }
         }
@@ -543,12 +545,12 @@ impl AsteroidsEngine {
             }
         };
 
-        self.rasterizer.wrapping = true;
+        //self.rasterizer.wrapping = true;
         self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, player_color);
         self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, player_color);
         self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, player_color);
         self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, player_color);
-        self.rasterizer.wrapping = false;
+        //self.rasterizer.wrapping = false;
     }
 
     ///// ====== PLAYER ====== /////
@@ -745,7 +747,7 @@ impl AsteroidsEngine {
                 let mtx_line7 = mtx.forward(asteroid.shape[7]);
 
                 // Draw lines to rasterizer with wrapping
-                self.rasterizer.wrapping = true;
+                //self.rasterizer.wrapping = true;
                 self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
                 self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
                 self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
@@ -754,7 +756,7 @@ impl AsteroidsEngine {
                 self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::white());
                 self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::white());
                 self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
-                self.rasterizer.wrapping = false;
+                //self.rasterizer.wrapping = false;
             }
             
         }
