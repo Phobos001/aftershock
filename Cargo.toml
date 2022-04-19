@@ -22,8 +22,9 @@ rusttype = "0.9.2" # TTF Rendering into Image
 
 [dev-dependencies]
 sdl2 = "0.35.0"
-minifb = "0.20.0"
+minifb = "0.22.0"
 framebuffer = "0.3.0"
+squares-rng = "0.1.1"
 
 [profile.release]
 opt-level = 3

@@ -221,7 +221,7 @@ impl TemplateEngine {
             
 
             // Image Drawing but T R A N S P A R E N T
-            self.rasterizer.set_draw_mode(DrawMode::AlphaFast);
+            self.rasterizer.set_draw_mode(DrawMode::Alpha);
             self.rasterizer.opacity = 128;
             //
             self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);

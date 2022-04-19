@@ -8,7 +8,8 @@ use aftershock::matrix3::*;
 use aftershock::math::*;
 use aftershock::color::*;
 use aftershock::drawables::*;
-use aftershock::random::*;
+
+use squares_rng::SquaresRNG;
 
 use std::time::Instant;
 
@@ -95,7 +96,7 @@ impl Asteroid {
         }
     }
 
-    pub fn generate_shape(radius: f32, rng: &mut Random) -> [Vector2; 8] {
+    pub fn generate_shape(radius: f32, rng: &mut SquaresRNG) -> [Vector2; 8] {
         let mut points: [Vector2; 8] = [
             Vector2::new(1.0, 0.0), // Right
             Vector2::new(0.5, 0.5), // Bottom Right
@@ -111,7 +112,7 @@ impl Asteroid {
         // Does not effect collisions
         for p in points.iter_mut() {
             *p *= radius;
-            *p += Vector2::new(rng.randf_range(-2.0, 2.0), rng.randf_range(-2.0, 2.0));
+            *p += Vector2::new(rng.rangef32(-2.0, 2.0), rng.rangef32(-2.0, 2.0));
         }
 
         points
@@ -166,7 +167,7 @@ pub struct AsteroidsEngine {
 
     pub paused: bool,
 
-    pub rng: Random,
+    pub rng: SquaresRNG,
     pub rng_number: f32,
 
     pub sf_score: SpriteFont,
@@ -197,7 +198,7 @@ impl AsteroidsEngine {
             camera_boomzoom: 1.0,
 
             // Use time in seconds as counter seed, and use the first RNG key in the table.
-            rng: Random::new(rng_seedcounter, 0),
+            rng: SquaresRNG::new(rng_seedcounter, 0),
             rng_number: 0.0,
 
             player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::one()},
@@ -317,7 +318,7 @@ impl AsteroidsEngine {
                 self.fps_print = self.fps;
                 self.fps = 0;
                 printtime = 0.0;
-                self.rng_number = self.rng.randf_linear01();
+                self.rng_number = self.rng.randf32();
             }
 
             self.update_controls(&event_pump);
@@ -562,12 +563,12 @@ impl AsteroidsEngine {
         for i in 0..self.explosion_particles.len() {
             if spawn_counter > 0 {
                 if self.explosion_particles[i].radius <= 0.1 {
-                    self.explosion_particles[i].radius = self.rng.randf_range(4.0, 16.0);
+                    self.explosion_particles[i].radius = self.rng.rangef32(4.0, 16.0);
                     self.explosion_particles[i].position = position;
                     self.explosion_particles[i].velocity = Vector2::new(
-                        self.rng.randf_range(-1.0, 1.0),
-                        self.rng.randf_range(-1.0, 1.0)
-                    ) * self.rng.randf_range(8.0, 256.0);
+                        self.rng.rangef32(-1.0, 1.0),
+                        self.rng.rangef32(-1.0, 1.0)
+                    ) * self.rng.rangef32(8.0, 256.0);
                     spawn_counter -= 1;
                 }
             } else {
@@ -677,11 +678,11 @@ impl AsteroidsEngine {
     pub fn spawn_asteroid(&mut self) {
         let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
 
-        asteroid.radius = self.rng.randf_range(4.0, 16.0);
+        asteroid.radius = self.rng.rangef32(4.0, 16.0);
         asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
-        asteroid.position = Vector2::new(self.rng.randf_range(0.0, RENDER_WIDTH as f32), self.rng.randf_range(0.0, RENDER_HEIGHT as f32));
-        asteroid.rotation = self.rng.randf_range(0.0, 6.28);
-        asteroid.velocity = Vector2::new(self.rng.randf_range(-1.0, 1.0), self.rng.randf_range(-1.0, 1.0)) * self.rng.randf_range(2.0, 64.0);
+        asteroid.position = Vector2::new(self.rng.rangef32(0.0, RENDER_WIDTH as f32), self.rng.rangef32(0.0, RENDER_HEIGHT as f32));
+        asteroid.rotation = self.rng.rangef32(0.0, 6.28);
+        asteroid.velocity = Vector2::new(self.rng.rangef32(-1.0, 1.0), self.rng.rangef32(-1.0, 1.0)) * self.rng.rangef32(2.0, 64.0);
         asteroid.active = true;
 
         self.uidx_asteroids += 1;
@@ -784,16 +785,17 @@ impl AsteroidsEngine {
     pub fn draw_score(&mut self) {
         self.sf_score.text = format!("{:0>8}", self.score);
         self.sf_score.scale = Vector2::new(10.0, 10.0);
-        self.sf_score.spacing_horizontal = 64.0;
+        self.sf_score.spacing_horizontal = 6.0;
         self.sf_score.opacity = if self.sf_score.opacity > 32 { self.sf_score.opacity - 1} else { 32 };
-        self.sf_score.position = Vector2::new(8.0, 450.0);
+        self.sf_score.position = Vector2::new(8.0, 450.0) / 10.0;
         self.sf_score.draw(&mut self.rasterizer);
     }
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
         let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+        spritefont.spacing_horizontal = 4.0;
         spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
-        spritefont.scale = Vector2::new(2.0, 2.0);
+        spritefont.scale = Vector2::new(1.0, 1.0);
         spritefont.position = Vector2::new(8.0, 8.0);
         spritefont.opacity = 128;
         spritefont.draw(&mut self.rasterizer);

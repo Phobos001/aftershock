@@ -19,13 +19,18 @@ pub enum DrawMode {
     NoAlpha,
     Opaque,
     Alpha,
-    AlphaFast,
     Addition,
     Subtraction,
     Multiply,
     Divide,
     InvertedAlpha,
     InvertedOpaque,
+    AlphaSlow,
+    AdditionSlow,
+    SubtractionSlow,
+    MultiplySlow,
+    DivideSlow,
+    InvertedAlphaSlow,
     // Collect,
 }
 
@@ -64,26 +69,6 @@ fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0);
-
-    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
-    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
-    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
-    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
-}
-
-/// Draw pixels and blend them with the background based on the alpha channel
-fn pset_alpha_fast(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
-    
-    let fg = color * rasterizer.tint;
-    let bg = Color::new(
-        rasterizer.framebuffer.color[idx + 0],
-        rasterizer.framebuffer.color[idx + 1],
-        rasterizer.framebuffer.color[idx + 2],
-        255,
-    );
-
     let c = Color::blend_fast(fg, bg, rasterizer.opacity);
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
@@ -104,11 +89,7 @@ fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = if rasterizer.use_fast_alpha_blend {
-        Color::blend_fast(fg, bg, rasterizer.opacity) + bg
-    } else {
-        Color::blend(fg, bg, rasterizer.opacity as f32 / 255.0) + bg
-    };
+    let c = Color::blend_fast(fg, bg, rasterizer.opacity) + bg;
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -128,11 +109,7 @@ fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = if rasterizer.use_fast_alpha_blend {
-        Color::blend_fast(fg.inverted(), bg, rasterizer.opacity) * bg
-    } else {
-        Color::blend(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0) * bg
-    };
+    let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity) * bg;
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -152,11 +129,7 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = if rasterizer.use_fast_alpha_blend {
-        Color::blend_fast(fg.inverted(), bg, rasterizer.opacity)
-    } else {
-        Color::blend(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0)
-    };
+    let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity);
     
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
@@ -170,6 +143,87 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a < 255 { return; }
     let c = (color * rasterizer.tint).inverted();
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+/// Draw pixels and blend them with the background based on the alpha channel
+fn pset_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    
+    let fg = color * rasterizer.tint;
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f32 / 255.0);
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+/// Add incoming and buffer pixels together and draw to screen
+fn pset_addition_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    if color.a <= 0 { return; }
+    let fg = color * rasterizer.tint;
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f32 / 255.0) + bg;
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+/// Multiply incoming pixel with buffer pixel.
+fn pset_multiply_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    if color.a <= 0 { return; }
+    let fg = color * rasterizer.tint;
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0) * bg;
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_cls += 1;
+}
+
+/// Draw inverted copy of incoming pixel with alpha blending
+fn pset_inverted_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    if color.a <= 0 { return; }
+    let fg = color* rasterizer.tint;
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0);
+    
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -200,7 +254,6 @@ pub struct Rasterizer {
     pub tint: Color,
     pub opacity: u8,
     pub interlacing: bool,
-    pub use_fast_alpha_blend: bool,
 
     pub camera: Vector2,
 
@@ -227,7 +280,6 @@ impl Rasterizer {
             tint: Color::white(),
             opacity: 255,
             interlacing: false,
-            use_fast_alpha_blend: true,
 
             camera: Vector2::zero(),
 
@@ -246,15 +298,18 @@ impl Rasterizer {
     /// * 'mode' - Which drawing function should the Rasterizer use.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
-            DrawMode::NoOp              => {self.pset_op = pset_noop;}
-            DrawMode::NoAlpha           => {self.pset_op = pset_noalpha;}
-            DrawMode::Opaque            => {self.pset_op = pset_opaque;},
-            DrawMode::Alpha             => {self.pset_op = pset_alpha;},
-            DrawMode::AlphaFast         => {self.pset_op = pset_alpha_fast;},
-            DrawMode::Addition          => {self.pset_op = pset_addition;},
-            DrawMode::Multiply          => {self.pset_op = pset_multiply;}
-            DrawMode::InvertedAlpha     => {self.pset_op = pset_inverted_alpha;}
-            DrawMode::InvertedOpaque    => {self.pset_op = pset_inverted_opaque;}
+            DrawMode::NoOp                  => {self.pset_op = pset_noop;}
+            DrawMode::NoAlpha               => {self.pset_op = pset_noalpha;}
+            DrawMode::Opaque                => {self.pset_op = pset_opaque;},
+            DrawMode::Alpha                 => {self.pset_op = pset_alpha;},
+            DrawMode::Addition              => {self.pset_op = pset_addition;},
+            DrawMode::Multiply              => {self.pset_op = pset_multiply;}
+            DrawMode::InvertedAlpha         => {self.pset_op = pset_inverted_alpha;}
+            DrawMode::InvertedOpaque        => {self.pset_op = pset_inverted_opaque;}
+            DrawMode::AlphaSlow             => {self.pset_op = pset_alpha_slow;},
+            DrawMode::AdditionSlow          => {self.pset_op = pset_addition_slow;},
+            DrawMode::MultiplySlow          => {self.pset_op = pset_multiply_slow;}
+            DrawMode::InvertedAlphaSlow     => {self.pset_op = pset_inverted_alpha_slow;}
             //DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
         }
@@ -279,68 +334,11 @@ impl Rasterizer {
         self.drawn_pixels_since_cls = 0;
     }
 
-    pub fn blend_rasterizer(&mut self, rasterizer: &mut Rasterizer, opacity: u8) {
-        if opacity == 0 { return; }
-
-        for y in 0..self.framebuffer.height {
-            for x in 0..self.framebuffer.width {
-                let (px, py) = (x as i32, y as i32);
-                self.pset(px, py, rasterizer.pget(px, py));
-            }
-        }
-    }
-
-    pub fn blend_frame_alpha(&mut self, framebuffer: &FrameBuffer, opacity: u8) {
-
-        if opacity == 0 { return; }
-
-        if self.framebuffer.width != framebuffer.width || self.framebuffer.height != framebuffer.height { return; }
-
-        self.framebuffer.color.chunks_exact_mut(4).enumerate().for_each(|(i, c)| {
-            let dst_color = Color::new(c[0], c[1], c[2], c[3]);
-            let src_color = Color::new(framebuffer.color[(i*4) + 0], framebuffer.color[(i*4) + 1], framebuffer.color[(i*4) + 2], framebuffer.color[(i*4) + 3]);
-
-            if src_color.a == 0 { return; }
-
-            let fc = Color::blend_fast(dst_color, src_color, 255 - opacity);
-
-            c[0] = fc.r;
-            c[1] = fc.g;
-            c[2] = fc.b;
-            c[3] = fc.a;
-        });
-    }
-
-    pub fn blend_frame_multiply(&mut self, framebuffer: &FrameBuffer) {
-
-        if self.framebuffer.width != framebuffer.width || self.framebuffer.height != framebuffer.height { return; }
-
-        self.framebuffer.color.chunks_exact_mut(4).enumerate().for_each(|(i, c)| {
-            let dst_color = Color::new(c[0], c[1], c[2], c[3]);
-            let src_color = Color::new(framebuffer.color[(i*4) + 0], framebuffer.color[(i*4) + 1], framebuffer.color[(i*4) + 2], framebuffer.color[(i*4) + 3]);
-
-            if src_color.a == 0 { return; }
-
-            let fc = Color::blend_fast(src_color, dst_color, 255) * dst_color;
-
-            c[0] = fc.r;
-            c[1] = fc.g;
-            c[2] = fc.b;
-            c[3] = fc.a;
-        });
-    }
-
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
 
         let x = x - f32::round(self.camera.x) as i32;
         let y = y - f32::round(self.camera.y) as i32;
-
-        let is_line_even: bool = y % 2 == 0;
-
-        if self.interlacing {
-            if (self.interlacing_on_even_lines && !is_line_even) || (!self.interlacing_on_even_lines && is_line_even) { return; }
-        }
 
         let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
 
@@ -376,8 +374,9 @@ impl Rasterizer {
         );
     }
     
-    /// Draws a line using the Bresenham algorithm across two points
+    /// Draws a line across two points
     pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
+        // Cant find original source but it's been modified for Rust from C or C++
 
         // Create local variables for moving start point
         let mut x0 = x0;

@@ -20,7 +20,7 @@ impl Color {
 	}
 
 	/// Accurate but slow alpha-blending function
-	pub fn blend(src: Color, dst: Color, opacity: f32) -> Color {
+	pub fn blend_slow(src: Color, dst: Color, opacity: f32) -> Color {
 		if src.a <= 0 { return Color::clear(); }
 
 		let src_rf32 = src.r as f32 / 255.0;
@@ -46,7 +46,7 @@ impl Color {
 		Color { r, g, b, a}
 	}
 
-	/// Faster but less accurate alpha-blending function. Recommended for performance
+	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
 		let alpha: u32 = (src.a - (255 - opacity)) as u32;

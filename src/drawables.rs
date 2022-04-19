@@ -113,7 +113,7 @@ impl SpriteFont {
             rasterizer.set_draw_mode(DrawMode::Alpha);
             for j in 0..self.glyphs.len() {
                 if self.glyphs[j].glyph == chars[i] {
-                    let newpos: Vector2 = self.position + Vector2::new(jumpx, jumpy);
+                    let newpos: Vector2 = (self.position + Vector2::new(jumpx, jumpy)) * self.scale;
                     
                     rasterizer.tint = self.tint;
                     rasterizer.opacity = self.opacity;
