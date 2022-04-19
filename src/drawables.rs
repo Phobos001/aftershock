@@ -75,7 +75,7 @@ impl SpriteFont {
         let mut generated_glpyhs: Vec<SpriteFontGlyph> = Vec::new();
         let glyphidx: Vec<char> = font.glyphidx.clone();
         for c in &font.glyphidx {
-            font_splitter.cls();
+            font_splitter.clear();
             font_splitter.pprint(&font, c.to_string(), 0, 0);
             let rasterized_char = font_splitter.framebuffer.to_image();
             generated_glpyhs.push(

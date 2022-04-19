@@ -35,7 +35,7 @@ pub enum DrawMode {
 }
 
 fn pset_noop(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 fn pset_noalpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
@@ -44,7 +44,7 @@ fn pset_noalpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = color.g;  // G
     rasterizer.framebuffer.color[idx + 2] = color.b;  // B
     rasterizer.framebuffer.color[idx + 3] = color.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels if they are fully opaque, otherwise ignore them.
@@ -55,7 +55,7 @@ fn pset_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = color.g;  // G
     rasterizer.framebuffer.color[idx + 2] = color.b;  // B
     rasterizer.framebuffer.color[idx + 3] = color.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels and blend them with the background based on the alpha channel
@@ -75,7 +75,7 @@ fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Add incoming and buffer pixels together and draw to screen
@@ -95,7 +95,7 @@ fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Multiply incoming pixel with buffer pixel.
@@ -115,7 +115,7 @@ fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel with alpha blending
@@ -136,7 +136,7 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel as opaque
@@ -148,7 +148,7 @@ fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels and blend them with the background based on the alpha channel
@@ -168,7 +168,7 @@ fn pset_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Add incoming and buffer pixels together and draw to screen
@@ -188,7 +188,7 @@ fn pset_addition_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Multiply incoming pixel with buffer pixel.
@@ -208,7 +208,7 @@ fn pset_multiply_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel with alpha blending
@@ -229,7 +229,7 @@ fn pset_inverted_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Colo
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
     rasterizer.framebuffer.color[idx + 2] = c.b;  // B
     rasterizer.framebuffer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_cls += 1;
+    rasterizer.drawn_pixels_since_clear += 1;
 }
 
 /* /// Collect drawn pixels into collected_pixels instead of drawing them to the buffer.
@@ -246,19 +246,17 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 #[derive(Clone)]
 pub struct Rasterizer {
     pset_op: PSetOp,
-    pub interlacing_on_even_lines: bool,
     
     pub framebuffer: FrameBuffer,
 
     pub draw_mode: DrawMode,
     pub tint: Color,
     pub opacity: u8,
-    pub interlacing: bool,
 
     pub camera: Vector2,
 
-    pub drawn_pixels_since_cls: u64,
-    pub time_since_cls: std::time::Duration,
+    pub drawn_pixels_since_clear: u64,
+    pub time_since_clear: std::time::Duration,
 }
 
 impl Rasterizer {
@@ -272,19 +270,17 @@ impl Rasterizer {
         //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
-            interlacing_on_even_lines: false, 
 
             framebuffer: FrameBuffer::new(width, height),
 
             draw_mode: DrawMode::Opaque,
             tint: Color::white(),
             opacity: 255,
-            interlacing: false,
 
             camera: Vector2::zero(),
 
-            drawn_pixels_since_cls: 0,
-            time_since_cls: std::time::Duration::new(0, 0),
+            drawn_pixels_since_clear: 0,
+            time_since_clear: std::time::Duration::new(0, 0),
         }
     }
 
@@ -316,22 +312,22 @@ impl Rasterizer {
     }
 
     /// Clears the frame memory directly, leaving a black screen.
-    pub fn cls(&mut self) {
+    pub fn clear(&mut self) {
         self.framebuffer.color = vec![0; self.framebuffer.width * self.framebuffer.height * 4];
-        self.drawn_pixels_since_cls = 0;
+        self.drawn_pixels_since_clear = 0;
     }
 
     /// Clears the screen to a color.
     /// # Arguments
     /// * 'color' - Color the screen should be cleared too.
-    pub fn cls_color(&mut self, color: Color) {
+    pub fn clear_color(&mut self, color: Color) {
         self.framebuffer.color.chunks_exact_mut(4).for_each(|c| {
             c[0] = color.r;
             c[1] = color.g;
             c[2] = color.b;
             c[3] = color.a;
         });
-        self.drawn_pixels_since_cls = 0;
+        self.drawn_pixels_since_clear = 0;
     }
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
@@ -676,45 +672,6 @@ impl Rasterizer {
             self.pline(v1x, v1y, v2x, v2y, color);
             self.pline(v1x, v1y, v3x, v3y, color);
             self.pline(v2x, v2y, v3x, v3y, color);
-        }
-    }
-
-    pub fn ptritex(&mut self, image: &Image, x1: i32, y1: i32, u1: f32, v1: f32, w1: f32,
-        x2: i32, y2: i32, u2: f32, v2: f32, w2: f32,
-        x3: i32, y3: i32, u3: f32, v3: f32, w3: f32) {
-        // Collect pixels from lines without drawing to the screen
-        let vl12 = self.cline(x1, y1, x2, y2);
-        let vl13 = self.cline(x1, y1, x3, y3);
-        let vl23 = self.cline(x2, y2, x3, y3);
-
-        let mut all_pixels: Vec<(i32, i32)> = Vec::new();
-        for p1 in vl12 {
-            all_pixels.push(p1);
-        }
-        for p2 in vl13 {
-            all_pixels.push(p2)
-        }
-        for p3 in vl23 {
-            all_pixels.push(p3);
-        }
-
-        let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
-
-        for p in &all_pixels {
-            if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1{
-                scanline_rows[p.1 as usize].push(*p);
-            }
-        }
-
-        for row in scanline_rows {
-            if row.len() == 0 { continue; }
-            let height = row[0].1;
-
-            for pxh in (row[0].0)..(row[row.len()-1].0) {
-                all_pixels.push((pxh, height));
-            }
-
-            
         }
     }
 

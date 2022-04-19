@@ -207,7 +207,7 @@ impl TemplateEngine {
             }
 
             // == GRAPHICS ==
-            self.rasterizer.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            self.rasterizer.clear_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
 
             // High level spritefont example
             spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
@@ -232,7 +232,7 @@ impl TemplateEngine {
 
             self.rasterizer.prectangle(true, self.actor_position.x as i32, self.actor_position.y as i32, 32, 32, Color::green());
 
-            let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+            let total_pixels = self.rasterizer.drawn_pixels_since_clear;
             self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
             
             // Present to screen

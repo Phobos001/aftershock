@@ -101,7 +101,7 @@ impl TemplateEngine {
             }
 
             // == GRAPHICS ==
-            self.rast1.cls_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            self.rast1.clear_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
 
             // High level spritefont example
             spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);
@@ -120,7 +120,7 @@ impl TemplateEngine {
             self.rast1.opacity = 255;
             self.rast1.set_draw_mode(DrawMode::Opaque);
 
-            let total_pixels = self.rast1.drawn_pixels_since_cls;
+            let total_pixels = self.rast1.drawn_pixels_since_clear;
             self.rast1.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
 
             

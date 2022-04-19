@@ -356,7 +356,7 @@ impl AsteroidsEngine {
             // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
             canvas.clear();
 
-            self.rasterizer.cls();
+            self.rasterizer.clear();
 
 
 
@@ -792,7 +792,7 @@ impl AsteroidsEngine {
     }
 
     pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
-        let total_pixels = self.rasterizer.drawn_pixels_since_cls;
+        let total_pixels = self.rasterizer.drawn_pixels_since_clear;
         spritefont.spacing_horizontal = 4.0;
         spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
         spritefont.scale = Vector2::new(1.0, 1.0);

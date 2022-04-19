@@ -47,6 +47,7 @@ impl Quaternion {
 		let y2 = self.y * self.y;
 		let z2 = self.z * self.z;
 
+		// HELP
 		mtx.m = [
 			[1.0 - 2.0 * y2, 					2.0 * x * y - 2.0 * w * z, 		2.0 * x * z + 2.0 * w * y, 		0.0],
 
