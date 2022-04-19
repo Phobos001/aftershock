@@ -4,6 +4,7 @@ extern crate rgb;
 use crate::color::*;
 use rgb::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Uncompressed bitmap image, typically loaded from PNG files.
 pub struct Image {
 	pub buffer: Vec<u8>,
@@ -23,10 +24,10 @@ impl Image {
 			is_error: true,
 		};
 
-		// Blank pixel (RGBA 4 Bytes)
-		img.buffer.push(0);
-		img.buffer.push(0);
-		img.buffer.push(0);
+		// White pixel (RGBA 4 Bytes)
+		img.buffer.push(255);
+		img.buffer.push(255);
+		img.buffer.push(255);
 		img.buffer.push(0);
 		img
 	}
@@ -59,6 +60,10 @@ impl Image {
 				return Image::default();
 			}
 		};
+	}
+
+	pub fn save(&self, path_to: &str) {
+		let _ = lodepng::encode32_file(path_to, self.buffer.as_slice(), self.width, self.height);
 	}
 
 	/// Change a pixel color in the image.

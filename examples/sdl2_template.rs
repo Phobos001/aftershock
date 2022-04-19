@@ -144,6 +144,7 @@ impl TemplateEngine {
 
         let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
         let sysfont: Font = Font::new("core/tiny_font.png", font_glyphidx, 5, 5, -1);
+        //self.rasterizer.pattern = Image::new("core/patterntest.png");
 
         // Spritefont example. More flexible than the standard pprint but also more expensive.
         let mut spritefont_test = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 8.0);
@@ -208,6 +209,7 @@ impl TemplateEngine {
 
             // == GRAPHICS ==
             self.rasterizer.clear_color(Color::hsv(self.realtime * 20.0, 1.0, 0.5));
+            
 
             // High level spritefont example
             spritefont_test.tint = Color::hsv(self.realtime * 360.0, 1.0, 1.0);

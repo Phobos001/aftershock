@@ -246,6 +246,8 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 #[derive(Clone)]
 pub struct Rasterizer {
     pset_op: PSetOp,
+    render_next_frame_as_animation: bool,
+    render_next_frame_folder: String,
     
     pub framebuffer: FrameBuffer,
 
@@ -257,6 +259,7 @@ pub struct Rasterizer {
 
     pub drawn_pixels_since_clear: u64,
     pub time_since_clear: std::time::Duration,
+
 }
 
 impl Rasterizer {
@@ -270,8 +273,12 @@ impl Rasterizer {
         //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
+            render_next_frame_as_animation: false,
+            render_next_frame_folder: "./".to_string(),
+
 
             framebuffer: FrameBuffer::new(width, height),
+            
 
             draw_mode: DrawMode::Opaque,
             tint: Color::white(),
@@ -281,6 +288,7 @@ impl Rasterizer {
 
             drawn_pixels_since_clear: 0,
             time_since_clear: std::time::Duration::new(0, 0),
+            
         }
     }
 
@@ -311,10 +319,16 @@ impl Rasterizer {
         }
     }
 
+    pub fn save_next_frame_draw_process_until_clear(&mut self, path_to: &str) {
+        self.render_next_frame_as_animation = true;
+        self.render_next_frame_folder = path_to.to_string();
+    }
+
     /// Clears the frame memory directly, leaving a black screen.
     pub fn clear(&mut self) {
         self.framebuffer.color = vec![0; self.framebuffer.width * self.framebuffer.height * 4];
         self.drawn_pixels_since_clear = 0;
+        self.render_next_frame_as_animation = false;
     }
 
     /// Clears the screen to a color.
@@ -328,6 +342,7 @@ impl Rasterizer {
             c[3] = color.a;
         });
         self.drawn_pixels_since_clear = 0;
+        self.render_next_frame_as_animation = false;
     }
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
@@ -348,6 +363,12 @@ impl Rasterizer {
         
         // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
         (self.pset_op)(self, idx, color);
+        if self.render_next_frame_as_animation {
+            self.framebuffer.to_image().save(format!("{}{}.png", self.render_next_frame_folder, self.drawn_pixels_since_clear).as_str());
+            // Let the OS think
+            std::thread::sleep(std::time::Duration::from_micros(10));
+        }
+
     }
 
     /// Gets a color from the color buffer.
