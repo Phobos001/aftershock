@@ -72,8 +72,12 @@ impl Vector2 {
 	}
 
 	/// Returns the 2D distance between two points.
-	pub fn distance(v1: Vector2, v2: Vector2) -> f32{
+	pub fn distance(v1: Vector2, v2: Vector2) -> f32 {
 		((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
+	}
+
+	pub fn direction(v1: Vector2, v2: Vector2) -> Vector2 {
+		(v2 - v1).normalized()
 	}
 
 	pub fn rotated(&self, radians: f32) -> Vector2 {
