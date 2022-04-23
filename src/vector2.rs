@@ -109,6 +109,66 @@ impl Vector2 {
 	pub fn inverse(&self) -> Vector2 {
 		Vector2::new(1.0 / self.x, 1.0 / self.y)
 	}
+
+	// Help from https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
+	pub fn intersection_infinite(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> (bool, Vector2) {
+		let a1: f32 = p1_end.y - p1_start.y;
+		let b1: f32 = p1_start.x - p1_end.x;
+		let c1: f32 = a1 * p1_start.x + b1 * p1_start.y;
+
+		let a2: f32 = p2_end.y - p2_start.y;
+		let b2: f32 = p2_start.x - p2_end.x;
+		let c2: f32 = a2 * p2_start.x + b2 * p2_start.y;
+
+		let determinant = a1 * b2 - a2 * b1;
+
+		if determinant == 0.0 { // No intersection: Lines are parallel
+			(false, Vector2::zero())
+		} else {
+			let point = Vector2::new(
+				(b2 * c1 - b1 * c2) / determinant,
+				(a1 * c2 - a2 * c1) / determinant
+			);
+			(true, point)
+		}
+	}
+
+	pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> (bool, Vector2) {
+		let a1: f32 = ray_end.y - ray_start.y;
+		let b1: f32 = ray_start.x - ray_end.x;
+		let c1: f32 = a1 * ray_start.x + b1 * ray_start.y;
+
+		let a2: f32 = line_end.y - line_start.y;
+		let b2: f32 = line_start.x - line_end.x;
+		let c2: f32 = a2 * line_start.x + b2 * line_start.y;
+
+		let determinant = a1 * b2 - a2 * b1;
+
+		if determinant == 0.0 { // No intersection: Lines are parallel
+			(false, Vector2::zero())
+		} else {
+			let point = Vector2::new(
+				(b2 * c1 - b1 * c2) / determinant,
+				(a1 * c2 - a2 * c1) / determinant
+			);
+			
+			// Make sure the point is actually on the line segment
+
+			let dist_line = Vector2::distance(line_start, line_end);
+			let dist_point_to_line_start = Vector2::distance(line_start, point);
+			let dist_point_to_line_end = Vector2::distance(line_end, point);
+
+			let error_margin: f32 = 0.0001;
+
+			let diff = dist_line - (dist_point_to_line_start + dist_point_to_line_end);
+			if diff < error_margin && diff > -error_margin {
+				(true, point)
+			} else {
+				(false, Vector2::zero())
+			}
+
+		}
+	}
 }
 
 impl std::ops::Add for Vector2 {
