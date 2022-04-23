@@ -89,6 +89,15 @@ impl Vector2 {
 		)
 	}
 
+	pub fn rotated_pivot(&self, radians: f32, pivot: Vector2) -> Vector2 {
+		let cos = radians.cos();
+		let sin = radians.sin();
+		Vector2::new(
+			((self.x - pivot.x) * cos) - ((pivot.y - self.y) * sin) + pivot.x,
+			pivot.y - ((pivot.y - self.y) * cos) + ((self.x - pivot.x) * sin)
+		)
+	}
+
 	pub fn slide(direction: Vector2, normal: Vector2) -> Vector2 {
 		direction - (normal * Vector2::dot(direction, normal))
 	}
