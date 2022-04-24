@@ -1,6 +1,6 @@
 [package]
 name    = "aftershock"
-version = "0.0.15"
+version = "0.0.16"
 authors = ["Keinan Powers / Phobos001"]
 edition = "2018"
 catagories = "graphics"
