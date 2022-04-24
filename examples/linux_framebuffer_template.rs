@@ -24,13 +24,13 @@ pub struct TemplateEngine {
     pub controls: u8,
     pub controls_last: u8,
 
-    pub realtime: f32,
-    pub timescale: f32,
+    pub realtime: f64,
+    pub timescale: f64,
     pub tics: u64,
     pub fps: u64,
     pub fps_print: u64,
-    pub dt: f32,
-    pub dt_unscaled: f32,
+    pub dt: f64,
+    pub dt_unscaled: f64,
 
     dt_before: Instant,
 
@@ -87,7 +87,7 @@ impl TemplateEngine {
         // Image example for transparency
         let graphics_and_shit = Image::new("core/default.png");
 
-        let mut printtime: f32 = 0.0;
+        let mut printtime: f64 = 0.0;
 
         'running: loop {
             self.update_times();
@@ -114,8 +114,8 @@ impl TemplateEngine {
             self.rast1.set_draw_mode(DrawMode::Alpha);
             self.rast1.opacity = 128;
             //
-            self.rast1.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
-            self.rast1.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
+            self.rast1.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i64, 160);
+            self.rast1.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i64, 160);
             
             self.rast1.opacity = 255;
             self.rast1.set_draw_mode(DrawMode::Opaque);
@@ -148,8 +148,8 @@ impl TemplateEngine {
 
     pub fn update_times(&mut self) {
         let now = Instant::now();
-        let now_s = (now.elapsed().as_secs() as f32) + (now.elapsed().subsec_nanos() as f32 * 1.0e-9);
-        let before_s = (self.dt_before.elapsed().as_secs() as f32) + (self.dt_before.elapsed().subsec_nanos() as f32 * 1.0e-9);
+        let now_s = (now.elapsed().as_secs() as f64) + (now.elapsed().subsec_nanos() as f64 * 1.0e-9);
+        let before_s = (self.dt_before.elapsed().as_secs() as f64) + (self.dt_before.elapsed().subsec_nanos() as f64 * 1.0e-9);
         self.dt_unscaled = before_s - now_s;
         
         self.dt_before = Instant::now();

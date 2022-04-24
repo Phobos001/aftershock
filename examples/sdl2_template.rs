@@ -31,21 +31,21 @@ pub struct TemplateEngine {
     pub video_mode: VideoMode,
     pub stretch_fill: bool,
 
-    pub mouse_x: f32,
-    pub mouse_y: f32,
+    pub mouse_x: f64,
+    pub mouse_y: f64,
 
     pub actor_position: Vector2,
 
     pub controls: u8,
     pub controls_last: u8,
 
-    pub realtime: f32,
-    pub timescale: f32,
+    pub realtime: f64,
+    pub timescale: f64,
     pub tics: u64,
     pub fps: u64,
     pub fps_print: u64,
-    pub dt: f32,
-    pub dt_unscaled: f32,
+    pub dt: f64,
+    pub dt_unscaled: f64,
 
     dt_before: Instant,
 
@@ -63,7 +63,7 @@ impl TemplateEngine {
             mouse_x: 0.0,
             mouse_y: 0.0,
 
-            actor_position: Vector2::new((RENDER_WIDTH / 2) as f32, (RENDER_HEIGHT / 2) as f32),
+            actor_position: Vector2::new((RENDER_WIDTH / 2) as f64, (RENDER_HEIGHT / 2) as f64),
 
             controls: 0,
             controls_last: 0,
@@ -156,10 +156,10 @@ impl TemplateEngine {
         // Image example for transparency
         let graphics_and_shit = Image::new("core/default.png");
 
-        let mut printtime: f32 = 0.0;
+        let mut printtime: f64 = 0.0;
 
-        let mut mouse_x: f32 = 0.0;
-        let mut mouse_y: f32 = 0.0;
+        let mut mouse_x: f64 = 0.0;
+        let mut mouse_y: f64 = 0.0;
 
         'running: loop {
             self.update_times();
@@ -172,8 +172,8 @@ impl TemplateEngine {
                         break 'running
                     },
                     Event::MouseMotion {xrel, yrel, x, y, ..} => {
-                        self.mouse_x = x as f32;
-                        self.mouse_y = y as f32;
+                        self.mouse_x = x as f64;
+                        self.mouse_y = y as f64;
                     }
                     _ => {}
                 }
@@ -219,20 +219,20 @@ impl TemplateEngine {
 
             
             // Image Drawing
-            self.rasterizer.pimg(&scotty, self.mouse_x as i32, self.mouse_y as i32);
+            self.rasterizer.pimg(&scotty, self.mouse_x as i64, self.mouse_y as i64);
             
 
             // Image Drawing but T R A N S P A R E N T
             self.rasterizer.set_draw_mode(DrawMode::Alpha);
             self.rasterizer.opacity = 128;
             //
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i32, 160);
-            self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i32, 160);
+            self.rasterizer.pimg(&graphics_and_shit, 256 + ((self.realtime.cos()) * 128.0) as i64, 160);
+            self.rasterizer.pimg(&graphics_and_shit, 256 + ((-self.realtime.cos()) * 128.0) as i64, 160);
             
             self.rasterizer.opacity = 255;
             self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
-            self.rasterizer.prectangle(true, self.actor_position.x as i32, self.actor_position.y as i32, 32, 32, Color::green());
+            self.rasterizer.prectangle(true, self.actor_position.x as i64, self.actor_position.y as i64, 32, 32, Color::green());
 
             let total_pixels = self.rasterizer.drawn_pixels_since_clear;
             self.rasterizer.pprint(&sysfont, format!("{:.1}ms  ({} UPS) pxd: {}", (self.dt * 100000.0).ceil() / 100.0, self.fps_print, total_pixels), 0, 0);
@@ -283,8 +283,8 @@ impl TemplateEngine {
 
     pub fn update_times(&mut self) {
         let now = Instant::now();
-        let now_s = (now.elapsed().as_secs() as f32) + (now.elapsed().subsec_nanos() as f32 * 1.0e-9);
-        let before_s = (self.dt_before.elapsed().as_secs() as f32) + (self.dt_before.elapsed().subsec_nanos() as f32 * 1.0e-9);
+        let now_s = (now.elapsed().as_secs() as f64) + (now.elapsed().subsec_nanos() as f64 * 1.0e-9);
+        let before_s = (self.dt_before.elapsed().as_secs() as f64) + (self.dt_before.elapsed().subsec_nanos() as f64 * 1.0e-9);
         self.dt_unscaled = before_s - now_s;
         
         self.dt_before = Instant::now();

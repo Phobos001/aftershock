@@ -21,14 +21,14 @@ pub struct Font {
 	pub fontimg: Image,
 	pub glyph_width: usize,
 	pub glyph_height: usize,
-	pub glyph_spacing: i32,
+	pub glyph_spacing: i64,
 }
 
 
 impl Font {
 
 	/// Load a font image from disk. The order
-	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i32) -> Font {
+	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i64) -> Font {
 
 		let glyphidx = glyphidxstr.to_string().chars().collect();
 		let glyphidx_sizes: Vec<FontGlyph> = Vec::new();
@@ -52,7 +52,7 @@ impl Font {
 		}
 	}
 
-	pub fn new_ttf(path_ttf: &str, glyphidxstr: &str, glyph_spacing: i32, point_size: f32, alpha_threshold: f32) -> Font {
+	pub fn new_ttf(path_ttf: &str, glyphidxstr: &str, glyph_spacing: i64, point_size: f32, alpha_threshold: f32) -> Font {
 		
 		let mut ttf_file = File::open(path_ttf).expect(format!("ERROR - FONT: TTF file {} does not exist!", path_ttf).as_str());
 		let mut ttf_buffer: Vec<u8> = Vec::new();
@@ -93,17 +93,17 @@ impl Font {
 
         for i in 0..glyphs.len() {
             if let Some(bounding_box) = glyphs[i].pixel_bounding_box() {
-				glyphidx_sizes[i].x = bounding_box.min.x;
-				glyphidx_sizes[i].y = bounding_box.min.y;
-				glyphidx_sizes[i].w = bounding_box.max.x;
-				glyphidx_sizes[i].h = bounding_box.max.y;
+				glyphidx_sizes[i].x = bounding_box.min.x as i64;
+				glyphidx_sizes[i].y = bounding_box.min.y as i64;
+				glyphidx_sizes[i].w = bounding_box.max.x as i64;
+				glyphidx_sizes[i].h = bounding_box.max.y as i64;
 
                 // Draw the glyph into the image per-pixel by using the draw closure
                 glyphs[i].draw(|x, y, v| {
                     fontimg.pset(
                         // Offset the position by the glyph bounding box
-                        x as i32 + bounding_box.min.x as i32,
-                        y as i32 + bounding_box.min.y as i32,
+                        x as i64 + bounding_box.min.x as i64,
+                        y as i64 + bounding_box.min.y as i64,
                         // Turn the coverage into an alpha value
                         Color::new(255, 255, 255, if v > alpha_threshold { 255 } else { 0 })
                     )
@@ -124,14 +124,14 @@ impl Font {
 
 #[derive(Copy, Clone, Debug)]
 pub struct FontGlyph {
-	pub x: i32,
-	pub y: i32,
-	pub w: i32,
-	pub h: i32,
+	pub x: i64,
+	pub y: i64,
+	pub w: i64,
+	pub h: i64,
 }
 
 impl FontGlyph {
-	pub fn new (x: i32, y: i32, w: i32, h: i32) -> FontGlyph {
+	pub fn new (x: i64, y: i64, w: i64, h: i64) -> FontGlyph {
 		FontGlyph {
 			x,
 			y,

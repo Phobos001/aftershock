@@ -67,14 +67,14 @@ impl Image {
 	}
 
 	/// Change a pixel color in the image.
-	pub fn pset(&mut self, x: i32, y: i32, color: Color) {
+	pub fn pset(&mut self, x: i64, y: i64, color: Color) {
 		if self.buffer.len() > 0 {
-			let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
+			let idx: usize = ((y * (self.width as i64) + x) * 4) as usize;
         
 			let out_left: bool = x < 0;
-			let out_right: bool = x > (self.width) as i32 - 1;
+			let out_right: bool = x > (self.width) as i64 - 1;
 			let out_top: bool = y < 0;
-			let out_bottom: bool = y > (self.height) as i32 - 1;
+			let out_bottom: bool = y > (self.height) as i64 - 1;
 			let out_of_range: bool = idx > (self.width * self.height * 4) - 1;
 
 			if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
@@ -88,14 +88,14 @@ impl Image {
 	}
 
 	/// Get a pixel color from the image.
-	pub fn pget(&self, x: i32, y: i32) -> Color {
+	pub fn pget(&self, x: i64, y: i64) -> Color {
 		if self.buffer.len() > 0 {
-			let idx: usize = ((y * (self.width as i32) + x) as usize) * 4;
+			let idx: usize = ((y * (self.width as i64) + x) as usize) * 4;
 
 			let out_left: bool = x < 0;
-			let out_right: bool = x > (self.width) as i32 - 1;
+			let out_right: bool = x > (self.width) as i64 - 1;
 			let out_top: bool = y < 0;
-			let out_bottom: bool = y > (self.height) as i32 - 1;
+			let out_bottom: bool = y > (self.height) as i64 - 1;
 			let out_of_range: bool = idx > (self.width * self.height * 4) - 1;
 
 			if out_of_range || out_left || out_right || out_top || out_bottom  { return Color::clear(); }

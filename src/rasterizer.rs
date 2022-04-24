@@ -10,7 +10,7 @@ use crate::framebuffer::*;
 pub type PSetOp = fn(&mut Rasterizer, usize, Color);
 
 // Calls functions in other structures with each pixel drawn. Good for 
-pub type OuterOp = fn(i32, i32, Color);
+pub type OuterOp = fn(i64, i64, Color);
 
 /// Controls how a rasterizer should draw incoming pixels.
 #[derive(Debug, Clone, Copy)]
@@ -162,7 +162,7 @@ fn pset_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f32 / 255.0);
+    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f64 / 255.0);
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -182,7 +182,7 @@ fn pset_addition_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f32 / 255.0) + bg;
+    let c = Color::blend_slow(fg, bg, rasterizer.opacity as f64 / 255.0) + bg;
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -202,7 +202,7 @@ fn pset_multiply_slow(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
         255,
     );
 
-    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0) * bg;
+    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f64 / 255.0) * bg;
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -222,7 +222,7 @@ fn pset_inverted_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Colo
         255,
     );
 
-    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f32 / 255.0);
+    let c = Color::blend_slow(fg.inverted(), bg, rasterizer.opacity as f64 / 255.0);
     
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
@@ -237,8 +237,8 @@ fn pset_inverted_alpha_slow(rasterizer: &mut Rasterizer, idx: usize, color: Colo
 /// build a polygonal area, then drawing a texture onto the pixels.
 fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     let idx_unstrided = idx / 4;
-    let x = modi(idx_unstrided as i32, rasterizer.framebuffer.width as i32);
-    let y = idx_unstrided as i32 / rasterizer.framebuffer.width as i32;
+    let x = modi(idx_unstrided as i64, rasterizer.framebuffer.width as i64);
+    let y = idx_unstrided as i64 / rasterizer.framebuffer.width as i64;
     rasterizer.collected_pixels.push((x, y, color));
 } */
 
@@ -346,17 +346,17 @@ impl Rasterizer {
     }
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
-    pub fn pset(&mut self, x: i32, y: i32, color: Color) {
+    pub fn pset(&mut self, x: i64, y: i64, color: Color) {
 
-        let x = x - f32::round(self.camera.x) as i32;
-        let y = y - f32::round(self.camera.y) as i32;
+        let x = x - f64::round(self.camera.x) as i64;
+        let y = y - f64::round(self.camera.y) as i64;
 
-        let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+        let idx: usize = ((y * (self.framebuffer.width as i64) + x) * 4) as usize;
 
         let out_left: bool = x < 0;
-        let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
+        let out_right: bool = x > (self.framebuffer.width) as i64 - 1;
         let out_top: bool = y < 0;
-        let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
+        let out_bottom: bool = y > (self.framebuffer.height) as i64 - 1;
         let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
 
         if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
@@ -372,13 +372,13 @@ impl Rasterizer {
     }
 
     /// Gets a color from the color buffer.
-    pub fn pget(&mut self, x: i32, y: i32) -> Color {
-        let idx: usize = ((y * (self.framebuffer.width as i32) + x) * 4) as usize;
+    pub fn pget(&mut self, x: i64, y: i64) -> Color {
+        let idx: usize = ((y * (self.framebuffer.width as i64) + x) * 4) as usize;
 
         let out_left: bool = x < 0;
-        let out_right: bool = x > (self.framebuffer.width) as i32 - 1;
+        let out_right: bool = x > (self.framebuffer.width) as i64 - 1;
         let out_top: bool = y < 0;
-        let out_bottom: bool = y > (self.framebuffer.height) as i32 - 1;
+        let out_bottom: bool = y > (self.framebuffer.height) as i64 - 1;
         let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
 
         if out_of_range || out_left || out_right || out_top || out_bottom  { return Color::black(); }
@@ -392,7 +392,7 @@ impl Rasterizer {
     }
     
     /// Draws a line across two points
-    pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
+    pub fn pline(&mut self, x0: i64, y0: i64, x1: i64, y1: i64, color: Color) {
         // Cant find original source but it's been modified for Rust from C or C++
 
         // Create local variables for moving start point
@@ -428,7 +428,7 @@ impl Rasterizer {
     }
 
     /// Draws a line using the Bresenham algorithm across two points. This second variation uses thickness
-    pub fn pline2(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, thickness: i32, color: Color) {
+    pub fn pline2(&mut self, x0: i64, y0: i64, x1: i64, y1: i64, thickness: i64, color: Color) {
 
         // Create local variables for moving start point
         let mut x0 = x0;
@@ -463,7 +463,7 @@ impl Rasterizer {
     }
     
     /// Draws a rectangle onto the screen. Can either be filled or outlined.
-    pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
+    pub fn prectangle(&mut self, filled: bool, x: i64, y: i64, w: i64, h: i64, color: Color) {
         let x0 = x;
         let x1 = x + (w-1);
         let y0 = y;
@@ -482,10 +482,10 @@ impl Rasterizer {
     }
     
     /// Draws a circle onto the screen. Can either be filled or outlined.
-    pub fn pcircle(&mut self, filled: bool, xc: i32, yc: i32, r: i32, color: Color) { 
-        let mut x: i32 = 0;
-        let mut y: i32 = r; 
-        let mut d: i32 = 3 - 2 * r; 
+    pub fn pcircle(&mut self, filled: bool, xc: i64, yc: i64, r: i64, color: Color) { 
+        let mut x: i64 = 0;
+        let mut y: i64 = r; 
+        let mut d: i64 = 3 - 2 * r; 
         
         if !filled {
             self.pset(xc+x, yc+y, color); 
@@ -532,18 +532,18 @@ impl Rasterizer {
     }
 
     /// Draws an image directly to the screen.
-    pub fn pimg(&mut self, image: &Image, x: i32, y: i32) {
+    pub fn pimg(&mut self, image: &Image, x: i64, y: i64) {
         for ly in 0..image.height {
             for lx in 0..image.width {
-                let pc = image.pget(lx as i32, ly as i32);
+                let pc = image.pget(lx as i64, ly as i64);
                 if pc.a <= 0 { continue; }
-                self.pset(x + lx as i32, y + ly as i32, pc);
+                self.pset(x + lx as i64, y + ly as i64, pc);
             }
         }
     }
 
     /// Draws a section of an image directly to the screen.
-    pub fn pimgrect(&mut self, image: &Image, x: i32, y: i32, rx: usize, ry: usize, rw: usize, rh: usize) {
+    pub fn pimgrect(&mut self, image: &Image, x: i64, y: i64, rx: usize, ry: usize, rw: usize, rh: usize) {
         let range_x = rx + rw;
         let range_y = ry + rh;
         for ly in ry..range_y {
@@ -551,16 +551,16 @@ impl Rasterizer {
                 let mlx = lx % image.width;
                 let mly = ly % image.height;
 
-                let px: i32 = (x + mlx as i32) - rx as i32;
-                let py: i32 = (y + mly as i32) - ry as i32;
+                let px: i64 = (x + mlx as i64) - rx as i64;
+                let py: i64 = (y + mly as i64) - ry as i64;
                 
-                self.pset(px, py, image.pget(mlx as i32, mly as i32));
+                self.pset(px, py, image.pget(mlx as i64, mly as i64));
             }
         }
     }
 
     /// Draws a rotated and scaled image to the screen using matrix multiplication.
-    pub fn pimgmtx(&mut self, image: &Image, position_x: f32, position_y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
+    pub fn pimgmtx(&mut self, image: &Image, position_x: f64, position_y: f64, rotation: f64, scale_x: f64, scale_y: f64, offset_x: f64, offset_y: f64) {
         let position: Vector2 = Vector2::new(position_x, position_y);
         let offset: Vector2 = Vector2::new(offset_x, offset_y);
         let scale: Vector2 = Vector2::new(scale_x, scale_y);
@@ -578,37 +578,37 @@ impl Rasterizer {
 
         // Top-Left Corner
         let p1: Vector2 = cmtx.forward(Vector2::zero());
-        sx = f32::min(sx, p1.x); sy = f32::min(sy, p1.y);
-        ex = f32::max(ex, p1.x); ey = f32::max(ey, p1.y);
+        sx = f64::min(sx, p1.x); sy = f64::min(sy, p1.y);
+        ex = f64::max(ex, p1.x); ey = f64::max(ey, p1.y);
 
         // Bottom-Right Corner
-        let p2: Vector2 = cmtx.forward(Vector2::new(image.width as f32, image.height as f32));
-        sx = f32::min(sx, p2.x); sy = f32::min(sy, p2.y);
-        ex = f32::max(ex, p2.x); ey = f32::max(ey, p2.y);
+        let p2: Vector2 = cmtx.forward(Vector2::new(image.width as f64, image.height as f64));
+        sx = f64::min(sx, p2.x); sy = f64::min(sy, p2.y);
+        ex = f64::max(ex, p2.x); ey = f64::max(ey, p2.y);
 
         // Bottom-Left Corner
-        let p3: Vector2 = cmtx.forward(Vector2::new(0.0, image.height as f32));
-        sx = f32::min(sx, p3.x); sy = f32::min(sy, p3.y);
-        ex = f32::max(ex, p3.x); ey = f32::max(ey, p3.y);
+        let p3: Vector2 = cmtx.forward(Vector2::new(0.0, image.height as f64));
+        sx = f64::min(sx, p3.x); sy = f64::min(sy, p3.y);
+        ex = f64::max(ex, p3.x); ey = f64::max(ey, p3.y);
 
         // Top-Right Corner
-        let p4: Vector2 = cmtx.forward(Vector2::new(image.width as f32, 0.0));
-        sx = f32::min(sx, p4.x); sy = f32::min(sy, p4.y);
-        ex = f32::max(ex, p4.x); ey = f32::max(ey, p4.y);
+        let p4: Vector2 = cmtx.forward(Vector2::new(image.width as f64, 0.0));
+        sx = f64::min(sx, p4.x); sy = f64::min(sy, p4.y);
+        ex = f64::max(ex, p4.x); ey = f64::max(ey, p4.y);
 
-        let mut rsx = sx as i32;
-        let mut rsy = sy as i32;
-        let mut rex = ex as i32;
-        let mut rey = ey as i32;
+        let mut rsx = sx as i64;
+        let mut rsy = sy as i64;
+        let mut rex = ex as i64;
+        let mut rey = ey as i64;
 
         // Sprite isn't even in frame, don't draw anything
-        if (rex < 0 || rsx > self.framebuffer.width as i32) && (rey < 0 || rsy > self.framebuffer.height as i32) { return; }
+        if (rex < 0 || rsx > self.framebuffer.width as i64) && (rey < 0 || rsy > self.framebuffer.height as i64) { return; }
 
         // Okay but clamp the ranges in frame so we're not wasting time on stuff offscreen
         if rsx < 0 { rsx = 0;}
         if rsy < 0 { rsy = 0;}
-        if rex > self.framebuffer.width as i32 { rex = self.framebuffer.width as i32; }
-        if rey > self.framebuffer.height as i32 { rey = self.framebuffer.height as i32; }
+        if rex > self.framebuffer.width as i64 { rex = self.framebuffer.width as i64; }
+        if rey > self.framebuffer.height as i64 { rey = self.framebuffer.height as i64; }
 
         let cmtx_inv = cmtx.clone().inv();
 
@@ -617,17 +617,17 @@ impl Rasterizer {
         for ly in rsy-8..rey+8 {
             for lx in rsx-8..rex+8 {
                 // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
-                let ip: Vector2 = cmtx_inv.forward(Vector2::new(lx as f32, ly as f32));
-                let color: Color = image.pget(ip.x as i32, ip.y as i32);
+                let ip: Vector2 = cmtx_inv.forward(Vector2::new(lx as f64, ly as f64));
+                let color: Color = image.pget(ip.x as i64, ip.y as i64);
                 // We skip drawing entirely if the alpha is zero.
                 if color.a <= 0 { continue; }
-                self.pset(lx as i32, ly as i32, color);
+                self.pset(lx as i64, ly as i64, color);
             }
         }
     }
 
     /// Draws text directly to the screen using a provided font.
-    pub fn pprint(&mut self, font: &Font, text: String, x: i32, y: i32) {
+    pub fn pprint(&mut self, font: &Font, text: String, x: i64, y: i64) {
         let mut jumpx: isize = 0;
         let mut jumpy: isize = 0;
         let chars: Vec<char> = text.chars().collect();
@@ -642,7 +642,7 @@ impl Rasterizer {
                     let rectw: usize = font.glyph_width;
                     let recth: usize = font.glyph_height;
                     
-                    self.pimgrect(&font.fontimg, x + jumpx as i32, y + jumpy as i32, rectx, recty, rectw, recth);
+                    self.pimgrect(&font.fontimg, x + jumpx as i64, y + jumpy as i64, rectx, recty, rectw, recth);
                     
 
                     jumpx += font.glyph_width as isize + font.glyph_spacing as isize;
@@ -652,7 +652,7 @@ impl Rasterizer {
     }
 
     /// Draws a triangle directly to the screen.
-    pub fn ptriangle(&mut self, filled: bool, v1x: i32, v1y: i32, v2x: i32, v2y: i32, v3x: i32, v3y: i32, color: Color) {
+    pub fn ptriangle(&mut self, filled: bool, v1x: i64, v1y: i64, v2x: i64, v2y: i64, v3x: i64, v3y: i64, color: Color) {
         if filled {
 
             // Collect pixels from lines without drawing to the screen
@@ -660,7 +660,7 @@ impl Rasterizer {
             let vl13 = self.cline(v1x, v1y, v3x, v3y);
             let vl23 = self.cline(v2x, v2y, v3x, v3y);
 
-            let mut all_pixels: Vec<(i32, i32)> = Vec::new();
+            let mut all_pixels: Vec<(i64, i64)> = Vec::new();
             for p1 in vl12 {
                 all_pixels.push(p1);
             }
@@ -671,10 +671,10 @@ impl Rasterizer {
                 all_pixels.push(p3);
             }
 
-            let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.framebuffer.height];
+            let mut scanline_rows: Vec<Vec<(i64, i64)>> = vec![Vec::new(); self.framebuffer.height];
 
             for p in all_pixels {
-                if p.1 > 0 && p.1 < self.framebuffer.height as i32 - 1{
+                if p.1 > 0 && p.1 < self.framebuffer.height as i64 - 1{
                     scanline_rows[p.1 as usize].push(p);
                 }
             }
@@ -806,11 +806,11 @@ impl Rasterizer {
                         tex_v = (1.0 - t) * tex_sv + t * tex_ev;
                         tex_w = (1.0 - t) * tex_sw + t * tex_ew;
                         //if tex_w > self.dget(j, i) {
-                            let px: i32 = (tex_u / tex_w) as i32;
-                            let py: i32 = (tex_v / tex_w) as i32;
+                            let px: i64 = (tex_u / tex_w) as i64;
+                            let py: i64 = (tex_v / tex_w) as i64;
                             let color = image.pget(px, py);
 
-                            self.pset(j as i32, i as i32, color);
+                            self.pset(j as i64, i as i64, color);
                             //self.dset(j, i, tex_w);
                         //}
                         t += tstep;
@@ -859,11 +859,11 @@ impl Rasterizer {
                         tex_v = (1.0 - t) * tex_sv + t * tex_ev;
                         tex_w = (1.0 - t) * tex_sw + t * tex_ew;
                         //if tex_w > self.dget(j, i) {
-                            let px: i32 = (tex_u / tex_w) as i32;
-                            let py: i32 = (tex_v / tex_w) as i32;
+                            let px: i64 = (tex_u / tex_w) as i64;
+                            let py: i64 = (tex_v / tex_w) as i64;
                             let color = image.pget(px, py);
 
-                            self.pset(j as i32, i as i32, color);
+                            self.pset(j as i64, i as i64, color);
                             //self.dset(j, i, tex_w);
                         //}
                         t += tstep;
@@ -873,22 +873,22 @@ impl Rasterizer {
     } */
 
     /// Draws a quadratic beizer curve onto the screen.
-    pub fn pbeizer(&mut self, thickness: i32, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
-        let mut step: f32 = 0.0;
+    pub fn pbeizer(&mut self, thickness: i64, x0: i64, y0: i64, x1: i64, y1: i64, mx: i64, my: i64, color: Color) {
+        let mut step: f64 = 0.0;
 
         // Get the maximal number of pixels we will need to use and get its inverse as a step size.
         // Otherwise we don't know how many pixels we will need to draw
-        let stride_c1 = self.cline(x0, y0, mx, my).len() as f32;
-        let stride_c2 = self.cline(mx, my, x1, y1).len() as f32;
+        let stride_c1 = self.cline(x0, y0, mx, my).len() as f64;
+        let stride_c2 = self.cline(mx, my, x1, y1).len() as f64;
 
-        let stride: f32 = (1.0 / (stride_c1 + stride_c2)) * 0.5;
+        let stride: f64 = (1.0 / (stride_c1 + stride_c2)) * 0.5;
 
-        let x0 = x0 as f32;
-        let y0 = x0 as f32;
-        let x1 = x1 as f32;
-        let y1 = y1 as f32;
-        let mx = mx as f32;
-        let my = my as f32;
+        let x0 = x0 as f64;
+        let y0 = x0 as f64;
+        let x1 = x1 as f64;
+        let y1 = y1 as f64;
+        let mx = mx as f64;
+        let my = my as f64;
 
         loop {
             if step > 1.0 { break; }
@@ -899,31 +899,31 @@ impl Rasterizer {
             let px1 = lerpf(px0, x1, step);
             let py1 = lerpf(py0, y1, step);
 
-            self.pcircle(true, px1 as i32, py1 as i32, thickness, color);
+            self.pcircle(true, px1 as i64, py1 as i64, thickness, color);
             step += stride;
         }
     }
 
     /// Draws a cubic beizer curve onto the screen.
-    pub fn pbeizer_cubic(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx0: i32, my0: i32, mx1: i32, my1: i32, color: Color) {
-        let mut step: f32 = 0.0;
+    pub fn pbeizer_cubic(&mut self, x0: i64, y0: i64, x1: i64, y1: i64, mx0: i64, my0: i64, mx1: i64, my1: i64, color: Color) {
+        let mut step: f64 = 0.0;
 
         // Get the maximal number of pixels we will need to use and get its inverse as a step size.
         // Otherwise we don't know how many pixels we will need to draw
-        let stride_c1: f32 = self.cline(x0, y0, mx0, my0).len() as f32;
-        let stride_c2: f32 = self.cline(mx0, my0, mx1, my1).len() as f32;
-        let stride_c3: f32 = self.cline(mx1, my1, x1, y1).len() as f32;
+        let stride_c1: f64 = self.cline(x0, y0, mx0, my0).len() as f64;
+        let stride_c2: f64 = self.cline(mx0, my0, mx1, my1).len() as f64;
+        let stride_c3: f64 = self.cline(mx1, my1, x1, y1).len() as f64;
 
         let stride = (1.0 / (stride_c1 + stride_c2 + stride_c3)) * 0.5;
 
-        let x0 = x0 as f32;
-        let y0 = x0 as f32;
-        let x1 = x1 as f32;
-        let y1 = y1 as f32;
-        let mx0 = mx0 as f32;
-        let my0 = my0 as f32;
-        let mx1 = mx1 as f32;
-        let my1 = my1 as f32;
+        let x0 = x0 as f64;
+        let y0 = x0 as f64;
+        let x1 = x1 as f64;
+        let y1 = y1 as f64;
+        let mx0 = mx0 as f64;
+        let my0 = my0 as f64;
+        let mx1 = mx1 as f64;
+        let my1 = my1 as f64;
 
         loop {
             if step > 1.0 { break; }
@@ -937,7 +937,7 @@ impl Rasterizer {
             let px2 = lerpf(px1, x1, step);
             let py2 = lerpf(py1, y1, step);
 
-            self.pset(px2 as i32, py2 as i32, color);
+            self.pset(px2 as i64, py2 as i64, color);
             step += stride;
         }
     }
@@ -946,9 +946,9 @@ impl Rasterizer {
     // Collecting versions of drawing functions
 
     /// Returns pixel positions across the line.
-    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    pub fn cline(&mut self, x0: i64, y0: i64, x1: i64, y1: i64) -> Vec<(i64, i64)> {
 
-        let mut pixels: Vec<(i32, i32)> = Vec::new();
+        let mut pixels: Vec<(i64, i64)> = Vec::new();
 
         // Create local variables for moving start point
         let mut x0 = x0;

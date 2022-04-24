@@ -13,18 +13,18 @@ pub struct Sprite<'a> {
 	pub offset: Vector2,
 	pub image: &'a Image,
 	pub position: Vector2,
-	pub rotation: f32,
+	pub rotation: f64,
 	pub scale: Vector2,
     pub shear: Vector2,
 }
 
 impl<'a> Sprite<'a> {
-	pub fn new(image: &'a Image, x: f32, y: f32, a: f32, sx: f32, sy: f32, tint: Color) -> Sprite {
+	pub fn new(image: &'a Image, x: f64, y: f64, a: f64, sx: f64, sy: f64, tint: Color) -> Sprite {
 		Sprite {
             image,
             tint,
             opacity: 255,
-			offset: Vector2::new(-(image.width as f32) / 2.0, -(image.height as f32) / 2.0),
+			offset: Vector2::new(-(image.width as f64) / 2.0, -(image.height as f64) / 2.0),
 			position: Vector2::new(x, y),
 			rotation: a,
 			scale: Vector2::new(sx, sy),
@@ -52,20 +52,20 @@ pub struct SpriteFont {
     pub glyphs: Vec<SpriteFontGlyph>,
     pub glyphidx: Vec<char>,
     pub text: String,
-    pub spacing_horizontal: f32,
-    pub spacing_vertical: f32,
+    pub spacing_horizontal: f64,
+    pub spacing_vertical: f64,
 
     pub tint: Color,
     pub opacity: u8,
 
     pub position: Vector2,
     pub scale: Vector2,
-    pub rotation: f32,
+    pub rotation: f64,
     pub offset: Vector2,
 }
 
 impl SpriteFont {
-    pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing_horizontal: f32, glyph_spacing_vertical: f32) -> SpriteFont {
+    pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing_horizontal: f64, glyph_spacing_vertical: f64) -> SpriteFont {
         let font = Font::new(path_image, glyphidxstr, glyph_width, glyph_height, 0);
         if font.fontimg.buffer.len() <= 0 {
             println!("ERROR - SPRITEFONT: Font {} could not be loaded due to a missing image!", path_image);
@@ -103,8 +103,8 @@ impl SpriteFont {
     }
 
     pub fn draw(&self, rasterizer: &mut Rasterizer) {
-        let mut jumpx: f32 = 0.0;
-        let mut jumpy: f32 = 0.0;
+        let mut jumpx: f64 = 0.0;
+        let mut jumpy: f64 = 0.0;
         let chars: Vec<char> = self.text.chars().collect();
 
         for i in 0..chars.len() {

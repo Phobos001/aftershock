@@ -2,11 +2,11 @@ use crate::math::*;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector3 {
-	pub x: f32, pub y: f32, pub z: f32,
+	pub x: f64, pub y: f64, pub z: f64,
 }
 
 impl Vector3 {
-	pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
+	pub fn new(x: f64, y: f64, z: f64) -> Vector3 {
 		Vector3 {
 			x, y, z,
 		}
@@ -22,12 +22,12 @@ impl Vector3 {
 	pub fn backward() -> Vector3 { Vector3 {x: 0.0, y: 0.0, z: -1.0}}
 
 	/// Returns the squared magnitude of the vector.
-	pub fn magnitude_sqr(&self) -> f32 {
+	pub fn magnitude_sqr(&self) -> f64 {
 		(self.x * self.x) + (self.y * self.y) + (self.z * self.z)
 	}
 
 	/// Returns the real magnitude of the vector.
-	pub fn magnitude(&self) -> f32 {
+	pub fn magnitude(&self) -> f64 {
 		((self.x * self.x) + (self.y * self.y) + (self.z * self.z)).sqrt()
 	}
 
@@ -55,7 +55,7 @@ impl Vector3 {
 	}
 
 	/// Returns the dot product of two 3D vectors.
-	pub fn dot(v1: Vector3, v2: Vector3) -> f32 {
+	pub fn dot(v1: Vector3, v2: Vector3) -> f64 {
 		v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 	}
 
@@ -104,10 +104,10 @@ impl std::ops::Mul for Vector3 {
 	}
 }
 
-impl std::ops::Mul<f32> for Vector3 {
+impl std::ops::Mul<f64> for Vector3 {
 	type Output = Self;
 
-	fn mul(self, rhs: f32) -> Self {
+	fn mul(self, rhs: f64) -> Self {
 		Self {
 			x: self.x * rhs,
 			y: self.y * rhs,
@@ -140,10 +140,10 @@ impl std::ops::Rem for Vector3 {
 	}
 }
 
-impl std::ops::Div<f32> for Vector3 {
+impl std::ops::Div<f64> for Vector3 {
 	type Output = Self;
 
-	fn div(self, rhs: f32) -> Self {
+	fn div(self, rhs: f64) -> Self {
 		Self {
 			x: self.x / rhs,
 			y: self.y / rhs,
@@ -152,10 +152,10 @@ impl std::ops::Div<f32> for Vector3 {
 	}
 }
 
-impl std::ops::Rem<f32> for Vector3 {
+impl std::ops::Rem<f64> for Vector3 {
 	type Output = Self;
 
-	fn rem(self, rhs: f32) -> Self {
+	fn rem(self, rhs: f64) -> Self {
 		Self {
 			x: modf(self.x, rhs),
 			y: modf(self.y, rhs),
@@ -204,8 +204,8 @@ impl std::ops::RemAssign for Vector3 {
 	}
 }
 
-impl std::ops::MulAssign<f32> for Vector3 {
-	fn mul_assign(&mut self, rhs: f32) {
+impl std::ops::MulAssign<f64> for Vector3 {
+	fn mul_assign(&mut self, rhs: f64) {
         *self = Self {
             x: self.x * rhs,
             y: self.y * rhs,
@@ -214,8 +214,8 @@ impl std::ops::MulAssign<f32> for Vector3 {
     }
 }
 
-impl std::ops::DivAssign<f32> for Vector3 {
-	fn div_assign(&mut self, rhs: f32) {
+impl std::ops::DivAssign<f64> for Vector3 {
+	fn div_assign(&mut self, rhs: f64) {
         *self = Self {
             x: self.x / rhs,
             y: self.y / rhs,
@@ -224,8 +224,8 @@ impl std::ops::DivAssign<f32> for Vector3 {
     }
 }
 
-impl std::ops::RemAssign<f32> for Vector3 {
-	fn rem_assign(&mut self, rhs: f32) {
+impl std::ops::RemAssign<f64> for Vector3 {
+	fn rem_assign(&mut self, rhs: f64) {
 		*self = Self {
 			x: modf(self.x, rhs),
 			y: modf(self.y, rhs),

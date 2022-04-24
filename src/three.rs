@@ -23,15 +23,15 @@ pub struct MeshRenderer {
 // Wrapper for Matrix4 for handling projections
 pub struct Projection {
 	pub mtx: Matrix4,
-	pub field_of_view: f32,
-	pub clip_near: f32,
-	pub clip_far: f32,
-	pub screen_width: f32,
-	pub screen_height: f32,
+	pub field_of_view: f64,
+	pub clip_near: f64,
+	pub clip_far: f64,
+	pub screen_width: f64,
+	pub screen_height: f64,
 }
 
 impl Projection {
-	pub fn perspective(clip_near: f32, clip_far: f32, field_of_view: f32, screen_width: f32, screen_height: f32) -> Projection {
+	pub fn perspective(clip_near: f64, clip_far: f64, field_of_view: f64, screen_width: f64, screen_height: f64) -> Projection {
 		let mut projection = Projection {
 			mtx: Matrix4::identity(),
 			field_of_view,
@@ -90,7 +90,7 @@ impl Triangle {
 		}
 	}
 
-	pub fn new_f32(v1x: f32, v1y: f32, v1z: f32, v2x: f32, v2y: f32, v2z: f32, v3x: f32, v3y: f32, v3z: f32) -> Triangle {
+	pub fn new_f64(v1x: f64, v1y: f64, v1z: f64, v2x: f64, v2y: f64, v2z: f64, v3x: f64, v3y: f64, v3z: f64) -> Triangle {
 		Triangle {
 			v1: Vector3::new(v1x, v1y, v1z),
 			v2: Vector3::new(v2x, v2y, v2z),
@@ -111,28 +111,28 @@ impl Mesh {
 		Mesh {
 			triangles: vec![
 				// SOUTH
-				Triangle::new_f32(0.0, 0.0, 0.0,	0.0, 1.0, 0.0,		1.0, 1.0, 0.0),
-				Triangle::new_f32(0.0, 0.0, 0.0,	1.0, 1.0, 0.0,		1.0, 0.0, 0.0 ),
+				Triangle::new_f64(0.0, 0.0, 0.0,	0.0, 1.0, 0.0,		1.0, 1.0, 0.0),
+				Triangle::new_f64(0.0, 0.0, 0.0,	1.0, 1.0, 0.0,		1.0, 0.0, 0.0 ),
 
 				// EAST                                                      
-				Triangle::new_f32(1.0, 0.0, 0.0,	1.0, 1.0, 0.0,		1.0, 1.0, 1.0 ),
-				Triangle::new_f32(1.0, 0.0, 0.0,	1.0, 1.0, 1.0,		1.0, 0.0, 1.0 ),
+				Triangle::new_f64(1.0, 0.0, 0.0,	1.0, 1.0, 0.0,		1.0, 1.0, 1.0 ),
+				Triangle::new_f64(1.0, 0.0, 0.0,	1.0, 1.0, 1.0,		1.0, 0.0, 1.0 ),
 
 				// NORTH                                                     
-				Triangle::new_f32(1.0, 0.0, 1.0,	1.0, 1.0, 1.0,		0.0, 1.0, 1.0 ),
-				Triangle::new_f32(1.0, 0.0, 1.0,	0.0, 1.0, 1.0,		0.0, 0.0, 1.0 ),
+				Triangle::new_f64(1.0, 0.0, 1.0,	1.0, 1.0, 1.0,		0.0, 1.0, 1.0 ),
+				Triangle::new_f64(1.0, 0.0, 1.0,	0.0, 1.0, 1.0,		0.0, 0.0, 1.0 ),
 
 				// WEST                                                      
-				Triangle::new_f32(0.0, 0.0, 1.0,	0.0, 1.0, 1.0,		0.0, 1.0, 0.0 ),
-				Triangle::new_f32(0.0, 0.0, 1.0,	0.0, 1.0, 0.0,		0.0, 0.0, 0.0 ),
+				Triangle::new_f64(0.0, 0.0, 1.0,	0.0, 1.0, 1.0,		0.0, 1.0, 0.0 ),
+				Triangle::new_f64(0.0, 0.0, 1.0,	0.0, 1.0, 0.0,		0.0, 0.0, 0.0 ),
 
 				// TOP                                                       
-				Triangle::new_f32(0.0, 1.0, 0.0,	0.0, 1.0, 1.0,		1.0, 1.0, 1.0 ),
-				Triangle::new_f32(0.0, 1.0, 0.0,	1.0, 1.0, 1.0,		1.0, 1.0, 0.0 ),
+				Triangle::new_f64(0.0, 1.0, 0.0,	0.0, 1.0, 1.0,		1.0, 1.0, 1.0 ),
+				Triangle::new_f64(0.0, 1.0, 0.0,	1.0, 1.0, 1.0,		1.0, 1.0, 0.0 ),
 
 				// BOTTOM                                                    
-				Triangle::new_f32(1.0, 0.0, 1.0,	0.0, 0.0, 1.0,		0.0, 0.0, 0.0 ),
-				Triangle::new_f32(1.0, 0.0, 1.0,	0.0, 0.0, 0.0,		1.0, 0.0, 0.0 ),
+				Triangle::new_f64(1.0, 0.0, 1.0,	0.0, 0.0, 1.0,		0.0, 0.0, 0.0 ),
+				Triangle::new_f64(1.0, 0.0, 1.0,	0.0, 0.0, 0.0,		1.0, 0.0, 0.0 ),
 
 			],
 			uvs: Vec::new(),
@@ -176,9 +176,9 @@ impl MeshRenderer {
 			
 
 			rasterizer.ptriangle(!wireframe, 
-				projected_triangle.v1.x as i32, projected_triangle.v1.y as i32,
-				projected_triangle.v2.x as i32, projected_triangle.v2.y as i32,
-				projected_triangle.v3.x as i32, projected_triangle.v3.y as i32,
+				projected_triangle.v1.x as i64, projected_triangle.v1.y as i64,
+				projected_triangle.v2.x as i64, projected_triangle.v2.y as i64,
+				projected_triangle.v3.x as i64, projected_triangle.v3.y as i64,
 				color
 			);
 		}
@@ -216,9 +216,9 @@ impl MeshRenderer {
 			let lit_color = color * Color::new(lum, lum, lum, 255) ;
 
 			rasterizer.ptriangle(!wireframe, 
-				projected_triangle.v1.x as i32, projected_triangle.v1.y as i32,
-				projected_triangle.v2.x as i32, projected_triangle.v2.y as i32,
-				projected_triangle.v3.x as i32, projected_triangle.v3.y as i32,
+				projected_triangle.v1.x as i64, projected_triangle.v1.y as i64,
+				projected_triangle.v2.x as i64, projected_triangle.v2.y as i64,
+				projected_triangle.v3.x as i64, projected_triangle.v3.y as i64,
 				lit_color
 			);
 		}
