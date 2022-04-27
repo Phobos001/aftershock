@@ -10,12 +10,14 @@ pub fn clampi(value: i64, min: i64, max: i64) -> i64 {
 
 /// Returns the remainder of a division for 32-bit floats
 pub fn modf(value: f64, rhs: f64) -> f64 {
-	((value % rhs) + rhs) % rhs
+	//((value % rhs) + rhs) % rhs
+	value.rem_euclid(rhs)
 }
 
 /// Returns the remainder of a division for 32-bit integers
 pub fn modi(value: i64, rhs: i64) -> i64 {
-	((value % rhs) + rhs) % rhs
+	//((value % rhs) + rhs) % rhs
+	value.rem_euclid(rhs)
 }
 
 /// Returns a 32-bit float if the value is negative (-1.0), positive (1.0), or zero (0.0)
@@ -36,6 +38,10 @@ pub fn lerpf(a: f64, b: f64, t: f64) -> f64 {
 /// Returns a linearly interpolated 32-bit integer between a and b, using t as a percentage of... 'betweenness'?
 pub fn lerpi(a: i64, b: i64, t: f64) -> i64 {
 	((a + (b - a)) as f64 * t).floor() as i64
+}
+
+pub fn unlerpf(value: f64, min: f64, max: f64) -> f64 {
+	(value - min) / (max - min)
 }
 
 /// Returns a vector rotated in 2D space.

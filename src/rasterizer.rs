@@ -8,6 +8,7 @@ use crate::framebuffer::*;
 
 // Draw Mode Definition
 pub type PSetOp = fn(&mut Rasterizer, usize, Color);
+pub type DrawSafety = fn(&mut Rasterizer, i64, i64, Color);
 
 // Calls functions in other structures with each pixel drawn. Good for 
 pub type OuterOp = fn(i64, i64, Color);
@@ -25,6 +26,8 @@ pub enum DrawMode {
     Divide,
     InvertedAlpha,
     InvertedOpaque,
+    InvertedBgAlpha,
+    InvertedBgOpaque,
     AlphaSlow,
     AdditionSlow,
     SubtractionSlow,
@@ -32,6 +35,26 @@ pub enum DrawMode {
     DivideSlow,
     InvertedAlphaSlow,
     // Collect,
+}
+
+fn draw_safe(rasterizer: &mut Rasterizer, x: i64, y: i64, color: Color) {
+    let idx: usize = ((y * (rasterizer.framebuffer.width as i64) + x) * 4) as usize;
+
+    let out_left: bool = x < 0;
+    let out_right: bool = x > (rasterizer.framebuffer.width) as i64 - 1;
+    let out_top: bool = y < 0;
+    let out_bottom: bool = y > (rasterizer.framebuffer.height) as i64 - 1;
+    let out_of_range: bool = idx > (rasterizer.framebuffer.width * rasterizer.framebuffer.height * 4) - 1;
+
+    if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
+    
+    // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
+    (rasterizer.pset_op)(rasterizer, idx, color);
+        
+}
+
+fn draw_unsafe(rasterizer: &mut Rasterizer, x: i64, y: i64, color: Color) {
+    (rasterizer.pset_op)(rasterizer, ((y * (rasterizer.framebuffer.width as i64) + x) * 4) as usize, color);
 }
 
 fn pset_noop(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
@@ -130,7 +153,6 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     );
 
     let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity);
-    
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -142,7 +164,55 @@ fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 /// Draw inverted copy of incoming pixel as opaque
 fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
     if color.a < 255 { return; }
-    let c = (color * rasterizer.tint).inverted();
+
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = (bg * rasterizer.tint).inverted();
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_clear += 1;
+}
+
+/// Draw inverted copy of incoming pixel as opaque
+fn pset_inverted_bg_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    if color.a < 255 { return; }
+
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = (bg * rasterizer.tint).inverted();
+
+    rasterizer.framebuffer.color[idx + 0] = c.r;  // R
+    rasterizer.framebuffer.color[idx + 1] = c.g;  // G
+    rasterizer.framebuffer.color[idx + 2] = c.b;  // B
+    rasterizer.framebuffer.color[idx + 3] = c.a;  // A
+    rasterizer.drawn_pixels_since_clear += 1;
+}
+
+/// Draw inverted copy of incoming pixel as opaque
+fn pset_inverted_bg_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+    if color.a < 255 { return; }
+
+    let bg = Color::new(
+        rasterizer.framebuffer.color[idx + 0],
+        rasterizer.framebuffer.color[idx + 1],
+        rasterizer.framebuffer.color[idx + 2],
+        255,
+    );
+
+    let c = Color::blend_fast(bg, (bg * rasterizer.tint).inverted(), rasterizer.opacity);
 
     rasterizer.framebuffer.color[idx + 0] = c.r;  // R
     rasterizer.framebuffer.color[idx + 1] = c.g;  // G
@@ -246,6 +316,8 @@ fn pset_collect(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
 #[derive(Clone)]
 pub struct Rasterizer {
     pset_op: PSetOp,
+    draw_safety: DrawSafety,
+
     render_next_frame_as_animation: bool,
     render_next_frame_folder: String,
     
@@ -254,8 +326,6 @@ pub struct Rasterizer {
     pub draw_mode: DrawMode,
     pub tint: Color,
     pub opacity: u8,
-
-    pub camera: Vector2,
 
     pub drawn_pixels_since_clear: u64,
     pub time_since_clear: std::time::Duration,
@@ -273,18 +343,16 @@ impl Rasterizer {
         //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Rasterizer {
             pset_op: pset_opaque,
+            draw_safety: draw_safe,
+
             render_next_frame_as_animation: false,
             render_next_frame_folder: "./".to_string(),
 
-
             framebuffer: FrameBuffer::new(width, height),
-            
 
             draw_mode: DrawMode::Opaque,
             tint: Color::white(),
             opacity: 255,
-
-            camera: Vector2::zero(),
 
             drawn_pixels_since_clear: 0,
             time_since_clear: std::time::Duration::new(0, 0),
@@ -314,8 +382,18 @@ impl Rasterizer {
             DrawMode::AdditionSlow          => {self.pset_op = pset_addition_slow;},
             DrawMode::MultiplySlow          => {self.pset_op = pset_multiply_slow;}
             DrawMode::InvertedAlphaSlow     => {self.pset_op = pset_inverted_alpha_slow;}
+            DrawMode::InvertedBgOpaque      => {self.pset_op = pset_inverted_bg_opaque;}
+            DrawMode::InvertedBgAlpha       => {self.pset_op = pset_inverted_bg_alpha;}
             //DrawMode::Collect => {self.pset_op = pset_collect;}
             _ => {},
+        }
+    }
+
+    pub fn set_draw_safety(&mut self, safe: bool) {
+        if safe {
+            self.draw_safety = draw_safe;
+        } else {
+            self.draw_safety = draw_unsafe;
         }
     }
 
@@ -347,28 +425,13 @@ impl Rasterizer {
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i64, y: i64, color: Color) {
-
-        let x = x - f64::round(self.camera.x) as i64;
-        let y = y - f64::round(self.camera.y) as i64;
-
-        let idx: usize = ((y * (self.framebuffer.width as i64) + x) * 4) as usize;
-
-        let out_left: bool = x < 0;
-        let out_right: bool = x > (self.framebuffer.width) as i64 - 1;
-        let out_top: bool = y < 0;
-        let out_bottom: bool = y > (self.framebuffer.height) as i64 - 1;
-        let out_of_range: bool = idx > (self.framebuffer.width * self.framebuffer.height * 4) - 1;
-
-        if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
+        (self.draw_safety)(self, x, y, color);
         
-        // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
-        (self.pset_op)(self, idx, color);
-        if self.render_next_frame_as_animation {
+        /* if self.render_next_frame_as_animation {
             self.framebuffer.to_image().save(format!("{}{}.png", self.render_next_frame_folder, self.drawn_pixels_since_clear).as_str());
             // Let the OS think
             std::thread::sleep(std::time::Duration::from_micros(10));
-        }
-
+        } */
     }
 
     /// Gets a color from the color buffer.

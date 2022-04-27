@@ -141,14 +141,6 @@ impl Color {
 	pub fn cyan() -> Color {
 		Color { r: 0, g: 255, b: 255, a: 255 }
 	}
-
-	pub fn magenta() -> Color {
-		Color { r: 255, g: 0, b: 255, a: 255 }
-	}
-
-	pub fn orange() -> Color {
-		Color { r: 255, g: 128, b: 0, a: 255 }
-	}
 }
 
 impl std::ops::Add for Color {

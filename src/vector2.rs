@@ -161,40 +161,40 @@ impl Vector2 {
 	}
 
 	pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> (bool, Vector2) {
-		let a1: f64 = ray_end.y - ray_start.y;
-		let b1: f64 = ray_start.x - ray_end.x;
-		let c1: f64 = a1 * ray_start.x + b1 * ray_start.y;
 
-		let a2: f64 = line_end.y - line_start.y;
-		let b2: f64 = line_start.x - line_end.x;
-		let c2: f64 = a2 * line_start.x + b2 * line_start.y;
+		// Check for any intersection at all
+		let (intersection_hit, point) = Vector2::intersection_infinite(ray_start, ray_end, line_start, line_end);
 
-		let determinant = a1 * b2 - a2 * b1;
+		if intersection_hit {
 
-		if determinant == 0.0 { // No intersection: Lines are parallel
-			(false, Vector2::zero())
-		} else {
-			let point = Vector2::new(
-				(b2 * c1 - b1 * c2) / determinant,
-				(a1 * c2 - a2 * c1) / determinant
-			);
-			
-			
-			// Make sure the point is actually on the line segment
+			// First make sure the point is along the segment; between the start and end
+			let error_margin: f64 = 0.00001;
 
 			let dist_line = Vector2::distance(line_start, line_end);
 			let dist_point_to_line_start = Vector2::distance(line_start, point);
-			let dist_point_to_line_end = Vector2::distance(line_end, point);
-
-			let error_margin: f64 = 0.00001;
+			let dist_point_to_line_end = Vector2::distance(line_end, point);			
 
 			let diff = dist_line - (dist_point_to_line_start + dist_point_to_line_end);
-			if diff < error_margin && diff > -error_margin {
+			let is_on_segment = diff < error_margin && diff > -error_margin;
+
+			// Now make sure the intersected line is actually in front of the ray direction
+			// Otherwise intersections can occur on lines behind the ray and be incorrect
+
+			let is_in_ray_direction = Vector2::dot(
+				Vector2::direction(ray_start, ray_end), 
+				Vector2::direction(ray_start, point)
+			) > 0.0;
+
+			// Finally make sure the point is in the distance of the rays magnitude
+			let is_in_distance = Vector2::distance(ray_start, point) < Vector2::distance(ray_start, ray_end);
+
+			if is_in_ray_direction && is_on_segment && is_in_distance {
 				(true, point)
 			} else {
 				(false, Vector2::zero())
 			}
-
+		} else {
+			(false, point)
 		}
 	}
 }
