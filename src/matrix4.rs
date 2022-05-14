@@ -77,12 +77,12 @@ impl Matrix4 {
 		nmtx
 	}
 
-	pub fn transform_triangle(&self, triangle: Triangle) -> Triangle {
-		Triangle {
-			v1: self.forward(triangle.v1),
-			v2: self.forward(triangle.v2),
-			v3: self.forward(triangle.v3),
-		}
+	pub fn transform_triangle(&self, v1: Vector3, v2: Vector3, v3: Vector3) -> (Vector3, Vector3, Vector3) {
+		(
+			self.forward(v1),
+			self.forward(v2),
+			self.forward(v3)
+		)
 	}
 
 	pub fn forward(&self, vi: Vector3) -> Vector3 {

@@ -425,6 +425,7 @@ impl Rasterizer {
 
     /// Draws a pixel to the color buffer, using the rasterizers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i64, y: i64, color: Color) {
+        self.drawn_pixels_since_clear += 1;
         (self.draw_safety)(self, x, y, color);
         
         /* if self.render_next_frame_as_animation {

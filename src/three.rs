@@ -151,7 +151,7 @@ impl MeshRenderer {
 		}
 	}
 
-	pub fn draw_flat(&self, rasterizer: &mut Rasterizer, projection: &Projection, color: Color, wireframe: bool, cull_backfaces: bool) {
+	/* pub fn draw_flat(&self, rasterizer: &mut Rasterizer, projection: &Projection, color: Color, wireframe: bool, cull_backfaces: bool) {
 		for triangle in &self.mesh.triangles {
 			let translation = Matrix4::translated(self.position);
 			let rotation = Matrix4::rotated(self.rotation.z, self.rotation.y, self.rotation.x);
@@ -222,5 +222,5 @@ impl MeshRenderer {
 				lit_color
 			);
 		}
-	}
+	} */
 }

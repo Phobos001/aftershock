@@ -193,12 +193,14 @@ impl AsteroidsEngine {
         let rng_seedcounter = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs();
         let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
 
+        let rng_key: u64 = 0xd2f6ae576fced215; // Key requires even distribution of 0's and 1's
+
         AsteroidsEngine {
             camera: Matrix3::identity(),
             camera_boomzoom: 1.0,
 
             // Use time in seconds as counter seed, and use the first RNG key in the table.
-            rng: SquaresRNG::new(rng_seedcounter, 0),
+            rng: SquaresRNG::new_with_key(rng_seedcounter, rng_key), 
             rng_number: 0.0,
 
             player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::one()},
