@@ -18,23 +18,23 @@ impl Color {
 	}
 
 	/// Accurate but slow alpha-blending function
-	pub fn blend_slow(src: Color, dst: Color, opacity: f64) -> Color {
+	pub fn blend_slow(src: Color, dst: Color, opacity: f32) -> Color {
 		if src.a <= 0 { return Color::clear(); }
 
-		let src_rf64 = src.r as f64 / 255.0;
-		let src_gf64 = src.g as f64 / 255.0;
-		let src_bf64 = src.b as f64 / 255.0;
-		let src_af64 = (src.a as f64 / 255.0) * opacity;
+		let src_rf32 = src.r as f32 / 255.0;
+		let src_gf32 = src.g as f32 / 255.0;
+		let src_bf32 = src.b as f32 / 255.0;
+		let src_af32 = (src.a as f32 / 255.0) * opacity;
 
-		let dst_rf64 = dst.r as f64 / 255.0;
-		let dst_gf64 = dst.g as f64 / 255.0;
-		let dst_bf64 = dst.b as f64 / 255.0;
-		let dst_af64 = dst.a as f64 / 255.0;
+		let dst_rf32 = dst.r as f32 / 255.0;
+		let dst_gf32 = dst.g as f32 / 255.0;
+		let dst_bf32 = dst.b as f32 / 255.0;
+		let dst_af32 = dst.a as f32 / 255.0;
 
-		let fa = src_af64 + dst_af64 * (1.0 - src_af64);
-		let fr = (src_rf64 * src_af64 + dst_rf64 * (1.0 - src_af64)) / fa;
-		let fg = (src_gf64 * src_af64 + dst_gf64 * (1.0 - src_af64)) / fa;
-		let fb = (src_bf64 * src_af64 + dst_bf64 * (1.0 - src_af64)) / fa;
+		let fa = src_af32 + dst_af32 * (1.0 - src_af32);
+		let fr = (src_rf32 * src_af32 + dst_rf32 * (1.0 - src_af32)) / fa;
+		let fg = (src_gf32 * src_af32 + dst_gf32 * (1.0 - src_af32)) / fa;
+		let fb = (src_bf32 * src_af32 + dst_bf32 * (1.0 - src_af32)) / fa;
 
 		let r = (fr * 255.0).round() as u8;
 		let g = (fg * 255.0).round() as u8;
@@ -76,13 +76,13 @@ impl Color {
 	}
 
 	/// Hue, Saturation, and Value color definition. Should not be used per pixel due to casting and division use.
-	pub fn hsv(hue: f64, saturation: f64, value: f64) -> Color {
+	pub fn hsv(hue: f32, saturation: f32, value: f32) -> Color {
 		let hi: i32 = ((hue / 60.0).floor() as i32) % 6;
-		let f: f64 = (hue / 60.0) - (hue / 60.0).floor();
+		let f: f32 = (hue / 60.0) - (hue / 60.0).floor();
 
-		let p: f64 = value * (1.0 - saturation);
-		let q: f64 = value * (1.0 - (f * saturation));
-		let t: f64 = value * (1.0 - ((1.0 - f) * saturation));
+		let p: f32 = value * (1.0 - saturation);
+		let q: f32 = value * (1.0 - (f * saturation));
+		let t: f32 = value * (1.0 - ((1.0 - f) * saturation));
 
 		match hi
 		{
@@ -96,8 +96,8 @@ impl Color {
 		}
 	}
 
-	pub fn lerp_rgb(c1: Color, c2: Color, t: f64) -> Color {
-		let tb = (f64::clamp(t, 0.0, 1.0) / 255.0) as u8;
+	pub fn lerp_rgb(c1: Color, c2: Color, t: f32) -> Color {
+		let tb = (f32::clamp(t, 0.0, 1.0) / 255.0) as u8;
 		let mut cf: Color = Color::clear();
 
 		cf.r = c1.r + (c2.r - c1.r) * tb;

@@ -28,8 +28,8 @@ pub struct Player {
     pub active: bool,
     pub velocity: Vector2,
     pub position: Vector2,
-    pub rotation: f64,
-    pub radius: f64,
+    pub rotation: f32,
+    pub radius: f32,
     pub scale: Vector2,
 }
 
@@ -38,10 +38,10 @@ pub struct Bullet {
     pub active: bool,
     pub velocity: Vector2,
     pub position: Vector2,
-    pub rotation: f64,
-    pub radius: f64,
+    pub rotation: f32,
+    pub radius: f32,
     pub scale: Vector2,
-    pub lifetime: f64,
+    pub lifetime: f32,
 }
 
 impl Bullet {
@@ -64,8 +64,8 @@ pub struct Asteroid {
     pub shape: [Vector2; 8],
     pub velocity: Vector2,
     pub position: Vector2,
-    pub rotation: f64,
-    pub radius: f64,
+    pub rotation: f32,
+    pub radius: f32,
     pub scale: Vector2,
     pub health: u8,
 }
@@ -84,7 +84,7 @@ impl Asteroid {
         }
     }
 
-    pub fn generate_shape(radius: f64, rng: &mut SquaresRNG) -> [Vector2; 8] {
+    pub fn generate_shape(radius: f32, rng: &mut SquaresRNG) -> [Vector2; 8] {
         let mut points: [Vector2; 8] = [
             Vector2::new(1.0, 0.0), // Right
             Vector2::new(0.5, 0.5), // Bottom Right
@@ -100,7 +100,7 @@ impl Asteroid {
         // Does not effect collisions
         for p in points.iter_mut() {
             *p *= radius;
-            *p += Vector2::new(rng.rangef64(-2.0, 2.0), rng.rangef64(-2.0, 2.0));
+            *p += Vector2::new(rng.rangef32(-2.0, 2.0), rng.rangef32(-2.0, 2.0));
         }
 
         points
@@ -111,7 +111,7 @@ impl Asteroid {
 pub struct ExplosionParticle {
     pub position: Vector2,
     pub velocity: Vector2,
-    pub radius: f64,
+    pub radius: f32,
 }
 
 impl ExplosionParticle {
@@ -125,7 +125,7 @@ impl ExplosionParticle {
 }
 
 /// If the squared distance between the two points is smaller than the combined diameter's squared, then the two circles are overlapping!
-pub fn circle_overlap(p1: Vector2, r1: f64, p2: Vector2, r2: f64) -> bool {
+pub fn circle_overlap(p1: Vector2, r1: f32, p2: Vector2, r2: f32) -> bool {
     // Double the incoming radius's so they are diameter's instead.
     let (r1, r2) = (r1 * 2.0, r2 * 2.0);
     (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y) < (r1*r2) + (r1*r2)
@@ -133,7 +133,7 @@ pub fn circle_overlap(p1: Vector2, r1: f64, p2: Vector2, r2: f64) -> bool {
 
 pub struct AsteroidsEngine {
     pub camera: Matrix3,
-    pub camera_boomzoom: f64,
+    pub camera_boomzoom: f32,
 
     pub player: Player,
     pub asteroids: [Asteroid; 128],
@@ -141,7 +141,7 @@ pub struct AsteroidsEngine {
 
     pub explosion_particles: [ExplosionParticle; 8192],
 
-    pub score: i64,
+    pub score: i32,
 
     pub uidx_asteroids: usize,
     pub uidx_bullets: usize,
@@ -155,22 +155,22 @@ pub struct AsteroidsEngine {
     pub paused: bool,
 
     pub rng: SquaresRNG,
-    pub rng_number: f64,
+    pub rng_number: f32,
 
     pub font_score: Font,
 
     pub debug_collision: bool,
     pub debug_info: bool,
 
-    pub realtime: f64,
-    pub timescale: f64,
+    pub realtime: f32,
+    pub timescale: f32,
     pub tics: u64,
     pub fps: u64,
     pub fps_print: u64,
-    pub dt: f64,
-    pub dt_unscaled: f64,
+    pub dt: f32,
+    pub dt_unscaled: f32,
     
-    pub present_time: f64,
+    pub present_time: f32,
 
     dt_before: Instant,
 }
@@ -383,8 +383,8 @@ impl AsteroidsEngine {
             }
     
             self.player.position += self.player.velocity * self.dt;
-            self.player.position.x = self.player.position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
-            self.player.position.y = self.player.position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
+            self.player.position.x = self.player.position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f32);
+            self.player.position.y = self.player.position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f32);
 
             // Check if we are touching any asteroids or bullets. Escape if player is already dead
             for i in 0..self.asteroids.len() {
@@ -447,10 +447,10 @@ impl AsteroidsEngine {
         };
 
         //self.rasterizer.wrapping = true;
-        self.rasterizer.pline(mtx_line0.x as i64, mtx_line0.y as i64, mtx_line1.x as i64, mtx_line1.y as i64, player_color);
-        self.rasterizer.pline(mtx_line1.x as i64, mtx_line1.y as i64, mtx_line2.x as i64, mtx_line2.y as i64, player_color);
-        self.rasterizer.pline(mtx_line2.x as i64, mtx_line2.y as i64, mtx_line3.x as i64, mtx_line3.y as i64, player_color);
-        self.rasterizer.pline(mtx_line3.x as i64, mtx_line3.y as i64, mtx_line0.x as i64, mtx_line0.y as i64, player_color);
+        self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, player_color);
+        self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, player_color);
+        self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, player_color);
+        self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, player_color);
         //self.rasterizer.wrapping = false;
     }
 
@@ -463,12 +463,12 @@ impl AsteroidsEngine {
         for i in 0..self.explosion_particles.len() {
             if spawn_counter > 0 {
                 if self.explosion_particles[i].radius <= 0.1 {
-                    self.explosion_particles[i].radius = self.rng.rangef64(4.0, 16.0);
+                    self.explosion_particles[i].radius = self.rng.rangef32(4.0, 16.0);
                     self.explosion_particles[i].position = position;
                     self.explosion_particles[i].velocity = Vector2::new(
-                        self.rng.rangef64(-1.0, 1.0),
-                        self.rng.rangef64(-1.0, 1.0)
-                    ) * self.rng.rangef64(8.0, 256.0);
+                        self.rng.rangef32(-1.0, 1.0),
+                        self.rng.rangef32(-1.0, 1.0)
+                    ) * self.rng.rangef32(8.0, 256.0);
                     spawn_counter -= 1;
                 }
             } else {
@@ -493,9 +493,9 @@ impl AsteroidsEngine {
             if self.explosion_particles[i].radius > 0.1 {
                 let mtx_position = self.camera.forward(self.explosion_particles[i].position);
                 self.rasterizer.pcircle(false, 
-                    mtx_position.x as i64,
-                    mtx_position.y as i64,
-                    (self.explosion_particles[i].radius * self.camera_boomzoom) as i64, Color::hsv(0.1, 1.0, self.explosion_particles[i].radius / 8.0)
+                    mtx_position.x as i32,
+                    mtx_position.y as i32,
+                    (self.explosion_particles[i].radius * self.camera_boomzoom) as i32, Color::hsv(0.1, 1.0, self.explosion_particles[i].radius / 8.0)
                 );
             }
         }
@@ -511,8 +511,8 @@ impl AsteroidsEngine {
         // We need to move the camera closer to the center based on zoom since it's technically in the top-left corner
         let camera_translated = Matrix3::translated(
             Vector2::new(
-                lerpf(AsteroidsEngine::RENDER_WIDTH as f64 / 2.0, 0.0, self.camera_boomzoom), 
-                lerpf(AsteroidsEngine::RENDER_HEIGHT as f64 / 2.0, 0.0, self.camera_boomzoom)
+                lerpf(AsteroidsEngine::RENDER_WIDTH as f32 / 2.0, 0.0, self.camera_boomzoom), 
+                lerpf(AsteroidsEngine::RENDER_HEIGHT as f32 / 2.0, 0.0, self.camera_boomzoom)
             ));
 
         self.camera = camera_scaled * camera_translated;
@@ -529,7 +529,7 @@ impl AsteroidsEngine {
 
     ///// ====== BULLET ====== /////
 
-    pub fn spawn_bullet(&mut self, offset: Vector2, direction: Vector2, force: f64) {
+    pub fn spawn_bullet(&mut self, offset: Vector2, direction: Vector2, force: f32) {
         let mut bullet = &mut self.bullets[self.uidx_bullets % self.bullets.len()];
 
         bullet.position = offset;
@@ -549,8 +549,8 @@ impl AsteroidsEngine {
         for i in 0..self.bullets.len() {
             if self.bullets[i].active {
                 self.bullets[i].position += self.bullets[i].velocity * self.dt;
-                self.bullets[i].position.x = self.bullets[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
-                self.bullets[i].position.y = self.bullets[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
+                self.bullets[i].position.x = self.bullets[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f32);
+                self.bullets[i].position.y = self.bullets[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f32);
                 self.bullets[i].lifetime += self.dt;
                 if self.bullets[i].lifetime > 5.0 {
                     self.bullets[i].active = false;
@@ -563,7 +563,7 @@ impl AsteroidsEngine {
         for bullet in &self.bullets {
             if bullet.active {
                 let mtx_position = self.camera.forward(bullet.position);
-                self.rasterizer.pcircle(true, mtx_position.x as i64, mtx_position.y as i64, bullet.radius as i64, Color::white());
+                self.rasterizer.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::white());
             }   
         }
     }
@@ -578,11 +578,11 @@ impl AsteroidsEngine {
     pub fn spawn_asteroid(&mut self) {
         let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
 
-        asteroid.radius = self.rng.rangef64(4.0, 16.0);
+        asteroid.radius = self.rng.rangef32(4.0, 16.0);
         asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
-        asteroid.position = Vector2::new(self.rng.rangef64(0.0, AsteroidsEngine::RENDER_WIDTH as f64), self.rng.rangef64(0.0, AsteroidsEngine::RENDER_HEIGHT as f64));
-        asteroid.rotation = self.rng.rangef64(0.0, 6.28);
-        asteroid.velocity = Vector2::new(self.rng.rangef64(-1.0, 1.0), self.rng.rangef64(-1.0, 1.0)) * self.rng.rangef64(2.0, 64.0);
+        asteroid.position = Vector2::new(self.rng.rangef32(0.0, AsteroidsEngine::RENDER_WIDTH as f32), self.rng.rangef32(0.0, AsteroidsEngine::RENDER_HEIGHT as f32));
+        asteroid.rotation = self.rng.rangef32(0.0, 6.28);
+        asteroid.velocity = Vector2::new(self.rng.rangef32(-1.0, 1.0), self.rng.rangef32(-1.0, 1.0)) * self.rng.rangef32(2.0, 64.0);
         asteroid.active = true;
 
         self.uidx_asteroids += 1;
@@ -597,8 +597,8 @@ impl AsteroidsEngine {
                 asteroids_active += 1;
 
                 self.asteroids[i].position += self.asteroids[i].velocity * self.dt;
-                self.asteroids[i].position.x = self.asteroids[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
-                self.asteroids[i].position.y = self.asteroids[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
+                self.asteroids[i].position.x = self.asteroids[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f32);
+                self.asteroids[i].position.y = self.asteroids[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f32);
 
                 
 
@@ -649,14 +649,14 @@ impl AsteroidsEngine {
 
                 // Draw lines to rasterizer with wrapping
                 //self.rasterizer.wrapping = true;
-                self.rasterizer.pline(mtx_line0.x as i64, mtx_line0.y as i64, mtx_line1.x as i64, mtx_line1.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line1.x as i64, mtx_line1.y as i64, mtx_line2.x as i64, mtx_line2.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line2.x as i64, mtx_line2.y as i64, mtx_line3.x as i64, mtx_line3.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line3.x as i64, mtx_line3.y as i64, mtx_line4.x as i64, mtx_line4.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line4.x as i64, mtx_line4.y as i64, mtx_line5.x as i64, mtx_line5.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line5.x as i64, mtx_line5.y as i64, mtx_line6.x as i64, mtx_line6.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line6.x as i64, mtx_line6.y as i64, mtx_line7.x as i64, mtx_line7.y as i64, Color::white());
-                self.rasterizer.pline(mtx_line7.x as i64, mtx_line7.y as i64, mtx_line0.x as i64, mtx_line0.y as i64, Color::white());
+                self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
                 //self.rasterizer.wrapping = false;
             }
             
@@ -670,11 +670,11 @@ impl AsteroidsEngine {
 
     ///// ====== ENGINE ====== /////
 
-    pub fn add_score(&mut self, score: i64) {
+    pub fn add_score(&mut self, score: i32) {
         self.score += score;
     }
 
-    pub fn remove_score(&mut self, score: i64) {
+    pub fn remove_score(&mut self, score: i32) {
         self.score -= score;
         if self.score < 0 {
             self.score = 0;
@@ -697,25 +697,25 @@ impl AsteroidsEngine {
     }
 
     pub fn draw_debug_collision(&mut self) {
-        self.rasterizer.pcircle(false, self.player.position.x as i64, self.player.position.y as i64, self.player.radius as i64, Color::green());
+        self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::green());
 
         for asteroid in &self.asteroids {
             if asteroid.active {
-                self.rasterizer.pcircle(false, asteroid.position.x as i64, asteroid.position.y as i64, asteroid.radius as i64, Color::green());
+                self.rasterizer.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::green());
             }
         }
 
         for bullet in &self.bullets {
             if bullet.active {
-                self.rasterizer.pcircle(false, bullet.position.x as i64, bullet.position.y as i64, bullet.radius as i64, Color::green());
+                self.rasterizer.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::green());
             }
         }
     }
 
     pub fn update_times(&mut self) {
         let now = Instant::now();
-        let now_s = (now.elapsed().as_secs() as f64) + (now.elapsed().subsec_nanos() as f64 * 1.0e-9);
-        let before_s = (self.dt_before.elapsed().as_secs() as f64) + (self.dt_before.elapsed().subsec_nanos() as f64 * 1.0e-9);
+        let now_s = (now.elapsed().as_secs() as f32) + (now.elapsed().subsec_nanos() as f32 * 1.0e-9);
+        let before_s = (self.dt_before.elapsed().as_secs() as f32) + (self.dt_before.elapsed().subsec_nanos() as f32 * 1.0e-9);
         self.dt_unscaled = before_s - now_s;
         
         self.dt_before = Instant::now();
@@ -729,7 +729,7 @@ impl AsteroidsEngine {
 
     pub fn restart_game(&mut self) {
         self.player.active = true;
-        self.player.position = Vector2::new(AsteroidsEngine::RENDER_WIDTH as f64 / 2.0, AsteroidsEngine::RENDER_HEIGHT as f64 / 2.0);
+        self.player.position = Vector2::new(AsteroidsEngine::RENDER_WIDTH as f32 / 2.0, AsteroidsEngine::RENDER_HEIGHT as f32 / 2.0);
         self.player.velocity = Vector2::ZERO;
         self.player.rotation = 0.0;
 

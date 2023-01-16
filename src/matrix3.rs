@@ -3,7 +3,7 @@ use crate::vector2::*;
 /// 3x3 Matrix mainly for transforming 2D images, but can be used for anything.
 #[derive(Copy, Clone, Debug)]
 pub struct Matrix3 {
-	m: [[f64; 3]; 3],
+	m: [[f32; 3]; 3],
 }
 
 impl Matrix3 {
@@ -37,7 +37,7 @@ impl Matrix3 {
 	}
 
 	/// Creates a rotated 3x3 Matrix
-	pub fn rotated(radians: f64) -> Matrix3 {
+	pub fn rotated(radians: f32) -> Matrix3 {
 		let mut nmtx = Matrix3::identity();
 		nmtx.m[0][0] = radians.cos(); nmtx.m[1][0] = radians.sin();
 		nmtx.m[0][1] = -(radians.sin()); nmtx.m[1][1] = radians.cos();
@@ -63,12 +63,12 @@ impl Matrix3 {
 	/// Creates an inverse of this Matrix, usually for getting correct pixel information when drawing 2D Images.
 	pub fn inv(&self) -> Matrix3 {
 		let mut out = Matrix3::identity();
-		let det: f64 = 
+		let det: f32 = 
 			self.m[0][0] * (self.m[1][1] * self.m[2][2] - self.m[1][2] * self.m[2][1]) -
 			self.m[1][0] * (self.m[0][1] * self.m[2][2] - self.m[2][1] * self.m[0][2]) +
 			self.m[2][0] * (self.m[0][1] * self.m[1][2] - self.m[1][1] * self.m[0][2]);
 
-		let idet: f64 = 1.0 / det;
+		let idet: f32 = 1.0 / det;
 
 		out.m[0][0] = (self.m[1][1] * self.m[2][2] - self.m[1][2] * self.m[2][1]) * idet;
 		out.m[1][0] = (self.m[2][0] * self.m[1][2] - self.m[1][0] * self.m[2][2]) * idet;
@@ -89,7 +89,7 @@ impl std::ops::Mul for Matrix3 {
 	type Output = Self;
 
 	fn mul(self, rhs: Matrix3) -> Self::Output {
-		let mut fmtx: [[f64; 3]; 3] = [[0.0 ;3] ;3];
+		let mut fmtx: [[f32; 3]; 3] = [[0.0 ;3] ;3];
 		for c in 0..3 {
 			for r in 0..3 {
 				fmtx[c][r] =  self.m[0][r] * rhs.m[c][0] +

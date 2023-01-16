@@ -146,21 +146,21 @@ impl PartitionedRasterizer {
 		}
 	}
 
-	pub fn set_camera_position(&mut self, x: f64, y: f64) {
+	pub fn set_camera_position(&mut self, x: f32, y: f32) {
 		self.rasterizer.camera_position = Vector2::new(x, y);
 		for part in &mut self.partitions {
 			part.camera_position = Vector2::new(x, y);
 		}
 	}
 
-	pub fn set_camera_rotation(&mut self, rotation: f64) {
+	pub fn set_camera_rotation(&mut self, rotation: f32) {
 		self.rasterizer.camera_rotation = rotation;
 		for part in &mut self.partitions {
 			part.camera_rotation = rotation;
 		}
 	}
 
-	pub fn set_camera_scale(&mut self, x: f64, y: f64) {
+	pub fn set_camera_scale(&mut self, x: f32, y: f32) {
 		self.rasterizer.camera_scale = Vector2::new(x, y);
 		for part in &mut self.partitions {
 			part.camera_scale = Vector2::new(x, y);
@@ -179,35 +179,35 @@ impl PartitionedRasterizer {
 		self.generate_partitions();
 	}
 
-	pub fn blit(&mut self, image: &Rasterizer, x: i64, y: i64) {
+	pub fn blit(&mut self, image: &Rasterizer, x: i32, y: i32) {
 		self.rasterizer.blit(image, x, y);
 	}
 
-	pub fn pset(&mut self, x: i64, y: i64, color: Color) {
+	pub fn pset(&mut self, x: i32, y: i32, color: Color) {
 		self.rasterizer.pset(x, y, color);
 	}
 
-	pub fn pget(&mut self, x: i64, y: i64) {
+	pub fn pget(&mut self, x: i32, y: i32) {
 		self.rasterizer.pget(x, y);
 	}
 
 	// Too simple to parallelize
-	pub fn pline(&mut self, x0: i64, y0: i64, x1: i64, y1: i64, color: Color) {
+	pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
 		self.rasterizer.pline(x0, y0, x1, y1, color);
 	}
 
-	pub fn prectangle(&mut self, filled: bool, x: i64, y: i64, width: i64, height: i64, color: Color) {
+	pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, width: i32, height: i32, color: Color) {
 		let total_area = width * height;
 
 		// Run in parallel
-		if filled && total_area >= self.threshold as i64 {
+		if filled && total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
 			
 				for part in & mut self.partitions {
 	
-					let rx = x - part.offset_x as i64;
-					let ry = y - part.offset_y as i64;
+					let rx = x - part.offset_x as i32;
+					let ry = y - part.offset_y as i32;
 	
 					let handle = s.spawn(move || {
 	
@@ -222,7 +222,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i64, part.offset_y as i64);
+						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pcircle function!")
 					}
@@ -233,19 +233,19 @@ impl PartitionedRasterizer {
 		}
 	}
 
-	pub fn pcircle(&mut self, filled: bool, xc: i64, yc: i64, radius: i64, color: Color) {
-		let total_area = std::f64::consts::PI * (radius * radius) as f64 ;
+	pub fn pcircle(&mut self, filled: bool, xc: i32, yc: i32, radius: i32, color: Color) {
+		let total_area = std::f32::consts::PI * (radius * radius) as f32 ;
 
 		// Run in parallel
-		if total_area >= self.threshold as i64 as f64 {
+		if total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
 			
 				for part in & mut self.partitions {
 					//let mut part_clone = part.clone();
 	
-					let rx = xc - part.offset_x as i64;
-					let ry = yc - part.offset_y as i64;
+					let rx = xc - part.offset_x as i32;
+					let ry = yc - part.offset_y as i32;
 	
 					let handle = s.spawn(move || {
 	
@@ -260,7 +260,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i64, part.offset_y as i64);
+						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pcircle function!")
 					}
@@ -272,22 +272,22 @@ impl PartitionedRasterizer {
 		}
 	}
 
-	pub fn pimg(&mut self, image: &Rasterizer, x: i64, y: i64) {
+	pub fn pimg(&mut self, image: &Rasterizer, x: i32, y: i32) {
 
 		let width = image.width;
 		let height = image.height;
 		// Approximate area, can be bigger depending on rotation
-		let total_area = (width as i64) * (height as i64);
+		let total_area = (width as i32) * (height as i32);
 
 		// Run in parallel
-		if total_area >= self.threshold as i64 {
+		if total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
 			
 				for part in &mut self.partitions {
 
-					let rx = x - part.offset_x as i64;
-					let ry = y - part.offset_y as i64;
+					let rx = x - part.offset_x as i32;
+					let ry = y - part.offset_y as i32;
 
 
 					let handle = s.spawn(move || {
@@ -303,7 +303,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i64, part.offset_y as i64);
+						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimg function!")
 					}
@@ -316,22 +316,22 @@ impl PartitionedRasterizer {
 		
 	}
 
-	pub fn pimgrect(&mut self, image: &Rasterizer, x: i64, y: i64, ix: i64, iy: i64, iw: i64, ih: i64) {
+	pub fn pimgrect(&mut self, image: &Rasterizer, x: i32, y: i32, ix: i32, iy: i32, iw: i32, ih: i32) {
 
 		let width = image.width;
 		let height = image.height;
 		// Approximate area, can be bigger depending on rotation
-		let total_area = (width as i64) * (height as i64);
+		let total_area = (width as i32) * (height as i32);
 
 		// Run in parallel
-		if total_area >= self.threshold as i64 {
+		if total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
 			
 				for part in &mut self.partitions {
 
-					let rx = x - part.offset_x as i64;
-					let ry = y - part.offset_y as i64;
+					let rx = x - part.offset_x as i32;
+					let ry = y - part.offset_y as i32;
 
 
 					let handle = s.spawn(move || {
@@ -347,7 +347,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i64, part.offset_y as i64);
+						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimg function!")
 					}
@@ -360,23 +360,23 @@ impl PartitionedRasterizer {
 		
 	}
 
-	pub fn pimgmtx(&mut self, image: &Rasterizer, x: f64, y: f64, rotation: f64, scale_x: f64, scale_y: f64, offset_x: f64, offset_y: f64) {
+	pub fn pimgmtx(&mut self, image: &Rasterizer, x: f32, y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
 
 		let width = image.width;
 		let height = image.height;
 		// Approximate area, can be bigger depending on rotation
-		let total_area = (width as f64 * scale_x) * (height as f64 * scale_y);
+		let total_area = (width as f32 * scale_x) * (height as f32 * scale_y);
 
 		// Run in parallel
-		if total_area >= self.threshold as i64 as f64 {
+		if total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
 
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
 
 				// First pass: Find all regions that contain the image
 				for part in &mut self.partitions {
-					let rx = x - part.offset_x as f64;
-					let ry = y - part.offset_y as f64;
+					let rx = x - part.offset_x as f32;
+					let ry = y - part.offset_y as f32;
 					
 					let handle = s.spawn( move || {
 						
@@ -391,13 +391,13 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i64, part.offset_y as i64);
+						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimgmtx function!")
 					}
 				}
 				
-				//self.rasterizer.prectangle(false, rsx as i64, rsy as i64, (rex - rsx) as i64, (rey - rsy) as i64, Color::blue());
+				//self.rasterizer.prectangle(false, rsx as i32, rsy as i32, (rex - rsx) as i32, (rey - rsy) as i32, Color::blue());
 			})
 			
 		} else {
@@ -455,18 +455,18 @@ impl PartitionedRasterizer {
 	pub fn draw_debug_view(&mut self) {
 		for part in &self.partitions {
 			self.rasterizer.pline(
-				part.offset_x as i64, 
-				part.offset_y as i64, 
-				(part.offset_x + part.width)  as i64, 
-				part.offset_y  as i64, 
+				part.offset_x as i32, 
+				part.offset_y as i32, 
+				(part.offset_x + part.width)  as i32, 
+				part.offset_y  as i32, 
 				Color::new(255, 0, 255, 255)
 			);
 
 			self.rasterizer.pline(
-				part.offset_x as i64, 
-				part.offset_y as i64, 
-				part.offset_x  as i64, 
-				(part.offset_y + part.height) as i64, 
+				part.offset_x as i32, 
+				part.offset_y as i32, 
+				part.offset_x  as i32, 
+				(part.offset_y + part.height) as i32, 
 				Color::new(255, 0, 255, 255)
 			);
 		}

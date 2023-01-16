@@ -3,13 +3,13 @@ use crate::math::*;
 /// Two-dimensional floating-point Vector to be used as either a position or direction.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vector2 {
-	pub x: f64,
-	pub y: f64,
+	pub x: f32,
+	pub y: f32,
 }
 
 impl Vector2 {
 
-	pub fn new(x: f64, y: f64) -> Vector2 {
+	pub fn new(x: f32, y: f32) -> Vector2 {
 		Vector2 {
 			x,
 			y,
@@ -24,27 +24,27 @@ impl Vector2 {
 	pub const RIGHT: 	Vector2 = Vector2 {x:  1.0,  y:  0.0,};
 
 	/// Gets the width/height ratio of the vector as a 32-bit float.
-	pub fn ratio(&self) -> f64 {
+	pub fn ratio(&self) -> f32 {
 		self.x / self.y
 	}
 
-	pub fn angle(v1: Vector2, v2: Vector2) -> f64 {
-		f64::atan2(v2.y - v1.y, v2.x - v1.x)
+	pub fn angle(v1: Vector2, v2: Vector2) -> f32 {
+		f32::atan2(v2.y - v1.y, v2.x - v1.x)
 	}
 
-	pub fn angle_between(v1: Vector2, v2: Vector2, fov: f64) -> bool {
+	pub fn angle_between(v1: Vector2, v2: Vector2, fov: f32) -> bool {
 		let angle = Vector2::angle(v1, v2);
 		let half_fov = fov / 2.0;
 		angle > (-half_fov) && angle < half_fov
 	}
 
 	/// Returns the squared magnitude of the vector.
-	pub fn magnitude_sqr(&self) -> f64 {
+	pub fn magnitude_sqr(&self) -> f32 {
 		(self.x * self.x) + (self.y * self.y)
 	}
 
 	/// Returns the real magnitude of the vector.
-	pub fn magnitude(&self) -> f64 {
+	pub fn magnitude(&self) -> f32 {
 		((self.x * self.x) + (self.y * self.y)).sqrt()
 	}
 
@@ -65,17 +65,17 @@ impl Vector2 {
 	}
 
 	/// Returns the dot product of two 2D vectors.
-	pub fn dot(v1: Vector2, v2: Vector2) -> f64 {
+	pub fn dot(v1: Vector2, v2: Vector2) -> f32 {
 		v1.x * v2.x + v1.y * v2.y
 	}
 
 	/// Returns the cross product of two 2D vectors.
-	pub fn cross(v1: Vector2, v2: Vector2) -> f64 {
+	pub fn cross(v1: Vector2, v2: Vector2) -> f32 {
 		v1.x * v2.y - v1.y * v2.x
 	}
 
 	/// Returns the 2D distance between two points.
-	pub fn distance(v1: Vector2, v2: Vector2) -> f64 {
+	pub fn distance(v1: Vector2, v2: Vector2) -> f32 {
 		((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
 	}
 
@@ -83,7 +83,7 @@ impl Vector2 {
 		(v2 - v1).normalized()
 	}
 
-	pub fn rotated(&self, radians: f64) -> Vector2 {
+	pub fn rotated(&self, radians: f32) -> Vector2 {
 		let cos = radians.cos();
 		let sin = radians.sin();
 		Vector2::new(
@@ -92,7 +92,7 @@ impl Vector2 {
 		)
 	}
 
-	pub fn rotated_pivot(&self, radians: f64, pivot: Vector2) -> Vector2 {
+	pub fn rotated_pivot(&self, radians: f32, pivot: Vector2) -> Vector2 {
 		let cos = radians.cos();
 		let sin = radians.sin();
 
@@ -113,7 +113,7 @@ impl Vector2 {
 		direction - (normal * Vector2::dot(direction, normal) * 2.0)
 	}
 
-	pub fn lerp(v1: Vector2, v2: Vector2, t: f64) -> Vector2 {
+	pub fn lerp(v1: Vector2, v2: Vector2, t: f32) -> Vector2 {
 		Vector2 {
 			x: lerpf(v1.x, v2.x, t),
 			y: lerpf(v1.y, v2.y, t),
@@ -133,13 +133,13 @@ impl Vector2 {
 
 	// Help from https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
 	pub fn intersection_infinite(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> (bool, Vector2) {
-		let a1: f64 = p1_end.y - p1_start.y;
-		let b1: f64 = p1_start.x - p1_end.x;
-		let c1: f64 = a1 * p1_start.x + b1 * p1_start.y;
+		let a1: f32 = p1_end.y - p1_start.y;
+		let b1: f32 = p1_start.x - p1_end.x;
+		let c1: f32 = a1 * p1_start.x + b1 * p1_start.y;
 
-		let a2: f64 = p2_end.y - p2_start.y;
-		let b2: f64 = p2_start.x - p2_end.x;
-		let c2: f64 = a2 * p2_start.x + b2 * p2_start.y;
+		let a2: f32 = p2_end.y - p2_start.y;
+		let b2: f32 = p2_start.x - p2_end.x;
+		let c2: f32 = a2 * p2_start.x + b2 * p2_start.y;
 
 		let determinant = a1 * b2 - a2 * b1;
 
@@ -162,7 +162,7 @@ impl Vector2 {
 		if intersection_hit {
 
 			// First make sure the point is along the segment; between the start and end
-			let error_margin: f64 = 0.00001;
+			let error_margin: f32 = 0.00001;
 
 			let dist_line = Vector2::distance(line_start, line_end);
 			let dist_point_to_line_start = Vector2::distance(line_start, point);
@@ -226,10 +226,10 @@ impl std::ops::Mul for Vector2 {
 	}
 }
 
-impl std::ops::Mul<f64> for Vector2 {
+impl std::ops::Mul<f32> for Vector2 {
 	type Output = Self;
 
-	fn mul(self, rhs: f64) -> Self {
+	fn mul(self, rhs: f32) -> Self {
 		Self {
 			x: self.x * rhs,
 			y: self.y * rhs,
@@ -259,10 +259,10 @@ impl std::ops::Rem for Vector2 {
 	}
 }
 
-impl std::ops::Div<f64> for Vector2 {
+impl std::ops::Div<f32> for Vector2 {
 	type Output = Self;
 
-	fn div(self, rhs: f64) -> Self {
+	fn div(self, rhs: f32) -> Self {
 		Self {
 			x: self.x / rhs,
 			y: self.y / rhs,
@@ -270,10 +270,10 @@ impl std::ops::Div<f64> for Vector2 {
 	}
 }
 
-impl std::ops::Rem<f64> for Vector2 {
+impl std::ops::Rem<f32> for Vector2 {
 	type Output = Self;
 
-	fn rem(self, rhs: f64) -> Self {
+	fn rem(self, rhs: f32) -> Self {
 		Self {
 			x: self.x.rem_euclid(rhs),
 			y: self.y.rem_euclid(rhs),
@@ -317,8 +317,8 @@ impl std::ops::RemAssign for Vector2 {
 	}
 }
 
-impl std::ops::MulAssign<f64> for Vector2 {
-	fn mul_assign(&mut self, rhs: f64) {
+impl std::ops::MulAssign<f32> for Vector2 {
+	fn mul_assign(&mut self, rhs: f32) {
         *self = Self {
             x: self.x * rhs,
             y: self.y * rhs,
@@ -326,8 +326,8 @@ impl std::ops::MulAssign<f64> for Vector2 {
     }
 }
 
-impl std::ops::DivAssign<f64> for Vector2 {
-	fn div_assign(&mut self, rhs: f64) {
+impl std::ops::DivAssign<f32> for Vector2 {
+	fn div_assign(&mut self, rhs: f32) {
         *self = Self {
             x: self.x / rhs,
             y: self.y / rhs,
@@ -335,8 +335,8 @@ impl std::ops::DivAssign<f64> for Vector2 {
     }
 }
 
-impl std::ops::RemAssign<f64> for Vector2 {
-	fn rem_assign(&mut self, rhs: f64) {
+impl std::ops::RemAssign<f32> for Vector2 {
+	fn rem_assign(&mut self, rhs: f32) {
 		*self = Self {
 			x: self.x.rem_euclid(rhs),
 			y: self.y.rem_euclid(rhs),

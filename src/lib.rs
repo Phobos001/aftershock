@@ -15,7 +15,6 @@ pub mod font;
 
 // Utilities
 pub mod math;
-pub mod drawables;
 pub mod color;
 
 // Math 2D
