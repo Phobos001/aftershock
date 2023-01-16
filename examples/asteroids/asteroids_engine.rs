@@ -1,39 +1,27 @@
-// ECS would be perfect for this but I'm trying to keep things simple.
-
-// !!! Wrapping was removed from Aftershock on 12/13/2021 due to a noticable decrease in performance from branching
+extern crate device_query;
 
 use aftershock::rasterizer::*;
 use aftershock::vector2::*;
+use aftershock::color::*;
+use aftershock::font::*;
 use aftershock::matrix3::*;
 use aftershock::math::*;
-use aftershock::color::*;
-use aftershock::drawables::*;
 
 use squares_rng::SquaresRNG;
 
+use device_query::*;
+
 use std::time::Instant;
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::pixels::{PixelFormatEnum};
+pub const CONTROL_ROTATE_LEFT: u8   = 0;
+pub const CONTROL_ROTATE_RIGHT: u8  = 1;
+pub const CONTROL_THRUST_FORWARD: u8     = 2;
+pub const CONTROL_THRUST_BACKWARD: u8   = 3;
+pub const CONTROL_FIRE: u8   = 4;
+pub const CONTROL_PAUSE: u8  = 5;
+pub const CONTROL_DEBUG_COLLISION: u8 = 6;
+pub const CONTROL_DEBUG_INFO: u8 = 7;
 
-const RENDER_WIDTH: usize = 512;
-const RENDER_HEIGHT: usize = 512;
-
-const CONTROL_ROTATE_LEFT: u8   = 0;
-const CONTROL_ROTATE_RIGHT: u8  = 1;
-const CONTROL_THRUST_FORWARD: u8     = 2;
-const CONTROL_THRUST_BACKWARD: u8   = 3;
-const CONTROL_FIRE: u8   = 4;
-const CONTROL_PAUSE: u8  = 5;
-const CONTROL_DEBUG_COLLISION: u8 = 6;
-const CONTROL_DEBUG_INFO: u8 = 7;
-
-pub enum VideoMode {
-    Exclusive,
-    Fullscreen,
-    Windowed,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Player {
@@ -60,11 +48,11 @@ impl Bullet {
     pub fn new() -> Bullet {
         Bullet {
             active: false,
-            velocity: Vector2::zero(),
-            position: Vector2::zero(),
+            velocity: Vector2::ZERO,
+            position: Vector2::ZERO,
             rotation: 0.0,
             radius: 0.0,
-            scale: Vector2::one(),
+            scale: Vector2::ONE,
             lifetime: 0.0,
         }
     }
@@ -86,12 +74,12 @@ impl Asteroid {
     pub fn new() -> Asteroid {
         Asteroid {
             active: false,
-            shape: [Vector2::zero(); 8],
-            velocity: Vector2::zero(),
-            position: Vector2::zero(),
+            shape: [Vector2::ZERO; 8],
+            velocity: Vector2::ZERO,
+            position: Vector2::ZERO,
             rotation: 0.0,
             radius: 0.0,
-            scale: Vector2::one(),
+            scale: Vector2::ONE,
             health: 3,
         }
     }
@@ -129,8 +117,8 @@ pub struct ExplosionParticle {
 impl ExplosionParticle {
     pub fn new() -> ExplosionParticle {
         ExplosionParticle {
-            position: Vector2::zero(),
-            velocity: Vector2::zero(),
+            position: Vector2::ZERO,
+            velocity: Vector2::ZERO,
             radius: 0.0,
         }
     }
@@ -160,17 +148,16 @@ pub struct AsteroidsEngine {
 
     pub rasterizer: Rasterizer,
 
-    pub video_mode: VideoMode,
-
     pub controls: u8,
     pub controls_last: u8,
+    pub device_state: device_query::DeviceState,
 
     pub paused: bool,
 
     pub rng: SquaresRNG,
     pub rng_number: f64,
 
-    pub sf_score: SpriteFont,
+    pub font_score: Font,
 
     pub debug_collision: bool,
     pub debug_info: bool,
@@ -182,16 +169,23 @@ pub struct AsteroidsEngine {
     pub fps_print: u64,
     pub dt: f64,
     pub dt_unscaled: f64,
+    
+    pub present_time: f64,
 
     dt_before: Instant,
 }
 
 impl AsteroidsEngine {
+
+    pub const RENDER_WIDTH: usize = 512;
+    pub const RENDER_HEIGHT: usize = 512;
+
     pub fn new() -> AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
         let rng_seedcounter = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs();
-        let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
+        let tinyfont_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
+        let tinyfont10_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWZYZ1234567890!?/\\@#$%^&*()[]_-+=\"';:.";
 
         let rng_key: u64 = 0xd2f6ae576fced215; // Key requires even distribution of 0's and 1's
 
@@ -203,24 +197,23 @@ impl AsteroidsEngine {
             rng: SquaresRNG::new_with_key(rng_seedcounter, rng_key), 
             rng_number: 0.0,
 
-            player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::one()},
+            player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::ONE},
             asteroids: [Asteroid::new(); 128],
             bullets: [Bullet::new(); 128],
 
             explosion_particles: [ExplosionParticle::new(); 8192],
 
             score: 0,
-            sf_score: SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0),
+            font_score: Font::new("core/tiny_font10.png", tinyfont10_glyphidx, 10, 10, 1).unwrap(),
 
             uidx_asteroids: 0,
             uidx_bullets: 0,
 
-            rasterizer: Rasterizer::new(RENDER_WIDTH, RENDER_HEIGHT),
-
-            video_mode: VideoMode::Windowed,
+            rasterizer: Rasterizer::new(AsteroidsEngine::RENDER_WIDTH, AsteroidsEngine::RENDER_HEIGHT),
 
             controls: 0,
             controls_last: 0,
+            device_state: device_query::DeviceState::new(),
 
             debug_collision: false,
             debug_info: false,
@@ -235,174 +228,79 @@ impl AsteroidsEngine {
             tics: 0,
             fps: 0,
             fps_print: 0,
+
+            present_time: 0.0,
 		}
 	}
 
-    pub fn run(&mut self, hardware_accelerated: bool) -> u8 {
+    pub fn update(&mut self) {
 
-        // Init SDL and surface texture
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
+        self.update_times();
 
-        let title = "Asteroids!";
-        let window = {
-            match self.video_mode {
-                VideoMode::Exclusive => {
-                    video_subsystem
-                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
-                    .fullscreen()
-                    .position_centered()
-                    .build()
-                    .unwrap()
-                },
-                VideoMode::Fullscreen => {
-                    video_subsystem
-                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
-                    .fullscreen_desktop()
-                    .position_centered()
-                    .build()
-                    .unwrap()
-                },
-                VideoMode::Windowed => {
-                    video_subsystem
-                    .window(title, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
-                    .resizable()
-                    .position_centered()
-                    .build()
-                    .unwrap()
-                },
-            }
-        };
+        self.update_controls();
+        
 
-        let mut canvas = {
-            if hardware_accelerated {
-                window.into_canvas().build().map_err(|e| e.to_string()).unwrap()
-            } else {
-                window.into_canvas().software().build().map_err(|e| e.to_string()).unwrap()
-            }
-        };
-
-        let _ = canvas.set_logical_size(RENDER_WIDTH as u32, RENDER_HEIGHT as u32);
-        let texture_creator = canvas.texture_creator();
-
-        // This is what we update our buffers to
-        let mut screentex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA32, RENDER_WIDTH as u32, RENDER_HEIGHT as u32)
-            .map_err(|e| e.to_string()).unwrap();
-
-        canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
-        canvas.clear();
-        canvas.present();
-        let mut event_pump = sdl_context.event_pump().unwrap();
-
-        // ==== Actual engine stuff ====
-		// Font for drawing FPS and such
-
-		let font_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
-		let mut sys_spritefont: SpriteFont = SpriteFont::new("core/tiny_font.png", font_glyphidx, 5, 5, 7.0, 14.0);
-    
-
-        let mut printtime: f64 = 0.0;
-
-        'running: loop {
-            self.update_times();
-            
-			for event in event_pump.poll_iter() {
-                match event {
-                    Event::Quit {..} => {
-                        break 'running
-                    },
-                    _ => {},
-                }
-            }
-
-            printtime += self.dt_unscaled;
-            if printtime > 1.0 {
-                self.fps_print = self.fps;
-                self.fps = 0;
-                printtime = 0.0;
-                self.rng_number = self.rng.randf64();
-            }
-
-            self.update_controls(&event_pump);
-            
-
-            if self.is_control_pressed(CONTROL_PAUSE) {
-                self.paused = !self.paused;
-                if !self.paused {
-                    self.timescale = 1.0;
-                } else {
-                    self.timescale = 0.0;
-                }
-            }
-
-            if self.is_control_pressed(CONTROL_DEBUG_COLLISION) {
-                self.debug_collision = !self.debug_collision;
-            }
-
-            if self.is_control_pressed(CONTROL_DEBUG_INFO) {
-                self.debug_info = !self.debug_info;
-            }
-
-            // == UPDATING ==
-            
+        if self.is_control_pressed(CONTROL_PAUSE) {
+            self.paused = !self.paused;
             if !self.paused {
-                self.update_player();
-                self.update_asteroids();
-                self.update_bullets();
-                self.update_explosion_particles();
-                self.update_camera();
+                self.timescale = 1.0;
+            } else {
+                self.timescale = 0.0;
             }
-
-            // == DRAWING ==
-
-            // We HAVE to do this in case the window is resized, otherwise the screen texture would override anything in the window anyways
-            canvas.clear();
-
-            self.rasterizer.clear();
-
-
-
-            self.draw_explosion_particles();
-
-            self.draw_score();
-            self.draw_bullets();
-            self.draw_asteroids();
-            self.draw_player();
-
-            if self.paused {
-                self.rasterizer.set_draw_mode(DrawMode::Alpha);
-                self.rasterizer.opacity = if modf(self.realtime, 0.5) > 0.25 { 255 } else { 0 };
-                self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::white());
-                self.rasterizer.prectangle(true, 256, 232, 16, 32, Color::white());
-                self.rasterizer.opacity = 255;
-                self.rasterizer.set_draw_mode(DrawMode::Opaque);
-            }
-
-            if self.debug_info {
-                self.draw_performance_text(&mut sys_spritefont);
-            };
-
-            if self.debug_collision {
-                self.draw_debug_collision();
-            }
-
-
-            // == END OF GAME LOOP ==
-            
-            // Present to screen
-            let _ = screentex.update(None, &self.rasterizer.framebuffer.color, (RENDER_WIDTH * 4) as usize);
-            let _ = canvas.copy(&screentex, None, None);
-            canvas.present();
-            
-            // Book keeping
-            self.tics += 1;
-            self.fps += 1;
-
-            // Give the processor a break
-            std::thread::sleep(std::time::Duration::from_micros(1));
         }
 
-        return 0;
+        if self.is_control_pressed(CONTROL_DEBUG_COLLISION) {
+            self.debug_collision = !self.debug_collision;
+        }
+
+        if self.is_control_pressed(CONTROL_DEBUG_INFO) {
+            self.debug_info = !self.debug_info;
+        }
+
+        // == UPDATING ==
+        
+        if !self.paused {
+            self.update_player();
+            self.update_asteroids();
+            self.update_bullets();
+            self.update_explosion_particles();
+            self.update_camera();
+        }
+        
+        // Book keeping
+        self.tics += 1;
+        self.fps += 1;
+
+        // Give the processor a break
+        std::thread::sleep(std::time::Duration::from_micros(1));
+    }
+
+    pub fn draw(&mut self) {
+        self.rasterizer.clear();
+
+        self.draw_explosion_particles();
+
+        self.draw_score();
+        self.draw_bullets();
+        self.draw_asteroids();
+        self.draw_player();
+
+        if self.paused {
+            self.rasterizer.set_draw_mode(DrawMode::Alpha);
+            self.rasterizer.opacity = if self.realtime.rem_euclid(0.5) > 0.25 { 255 } else { 0 };
+            self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::white());
+            self.rasterizer.prectangle(true, 256, 232, 16, 32, Color::white());
+            self.rasterizer.opacity = 255;
+            self.rasterizer.set_draw_mode(DrawMode::Opaque);
+        }
+
+        if self.debug_info {
+            self.draw_performance_text();
+        };
+
+        if self.debug_collision {
+            self.draw_debug_collision();
+        }
     }
 
     pub fn is_control_down(&mut self, control: u8) -> bool {
@@ -417,8 +315,8 @@ impl AsteroidsEngine {
         (self.controls_last & (1 << control) != 0) && !(self.controls & (1 << control) != 0)
     }
 
-    pub fn update_controls(&mut self, event_pump: &sdl2::EventPump) {
-        let keys: Vec<Keycode> = event_pump.keyboard_state().pressed_scancodes().filter_map(Keycode::from_scancode).collect();
+    pub fn update_controls(&mut self) {
+        let keys: Vec<Keycode> = self.device_state.query_keymap();
 
         self.controls_last = self.controls;
         self.controls = 0;
@@ -466,7 +364,7 @@ impl AsteroidsEngine {
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
-                self.player.velocity += direction.forward(Vector2::right() * 64.0) * self.dt;
+                self.player.velocity += direction.forward(Vector2::RIGHT * 64.0) * self.dt;
             }
     
             if self.is_control_down(CONTROL_THRUST_BACKWARD) {
@@ -474,19 +372,19 @@ impl AsteroidsEngine {
     
                 // We accelerate instead of speed up, so we multiply by dt here as well as when we update the position
                 // Also we assume right is the starting rotation direction because of how we draw the player
-                self.player.velocity -= direction.forward(Vector2::right() * 64.0) * self.dt;
+                self.player.velocity -= direction.forward(Vector2::RIGHT * 64.0) * self.dt;
             }
     
             if self.is_control_pressed(CONTROL_FIRE) {
-                let direction = Matrix3::rotated(self.player.rotation).forward(Vector2::right());
+                let direction = Matrix3::rotated(self.player.rotation).forward(Vector2::RIGHT);
                 let offset = Matrix3::translated(self.player.position).forward(direction * 16.0);
                 
                 self.spawn_bullet(offset, direction.normalized(), self.player.velocity.magnitude() + 128.0);
             }
     
             self.player.position += self.player.velocity * self.dt;
-            self.player.position.x = modf(self.player.position.x, RENDER_WIDTH as f64);
-            self.player.position.y = modf(self.player.position.y, RENDER_HEIGHT as f64);
+            self.player.position.x = self.player.position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
+            self.player.position.y = self.player.position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
 
             // Check if we are touching any asteroids or bullets. Escape if player is already dead
             for i in 0..self.asteroids.len() {
@@ -584,7 +482,7 @@ impl AsteroidsEngine {
             if self.explosion_particles[i].radius > 0.1 {
                 self.explosion_particles[i].position += self.explosion_particles[i].velocity * self.dt;
                 self.explosion_particles[i].radius = lerpf(self.explosion_particles[i].radius, 0.0, 0.5 * self.dt);
-                self.explosion_particles[i].velocity = Vector2::lerp(self.explosion_particles[i].velocity, Vector2::up(), 1.0 * self.dt);
+                self.explosion_particles[i].velocity = Vector2::lerp(self.explosion_particles[i].velocity, Vector2::UP, 1.0 * self.dt);
             }
             
         }
@@ -609,12 +507,12 @@ impl AsteroidsEngine {
 
     pub fn update_camera(&mut self) {
         self.camera_boomzoom = lerpf(self.camera_boomzoom, 1.0, 5.0 * self.dt);
-        let camera_scaled = Matrix3::scaled(Vector2::one() * self.camera_boomzoom);
+        let camera_scaled = Matrix3::scaled(Vector2::ONE * self.camera_boomzoom);
         // We need to move the camera closer to the center based on zoom since it's technically in the top-left corner
         let camera_translated = Matrix3::translated(
             Vector2::new(
-                lerpf(RENDER_WIDTH as f64 / 2.0, 0.0, self.camera_boomzoom), 
-                lerpf(RENDER_HEIGHT as f64 / 2.0, 0.0, self.camera_boomzoom)
+                lerpf(AsteroidsEngine::RENDER_WIDTH as f64 / 2.0, 0.0, self.camera_boomzoom), 
+                lerpf(AsteroidsEngine::RENDER_HEIGHT as f64 / 2.0, 0.0, self.camera_boomzoom)
             ));
 
         self.camera = camera_scaled * camera_translated;
@@ -637,7 +535,7 @@ impl AsteroidsEngine {
         bullet.position = offset;
         bullet.velocity = direction * force;
         bullet.radius = 2.0;
-        bullet.scale = Vector2::one();
+        bullet.scale = Vector2::ONE;
         bullet.rotation = 0.0; // Really if the bullets don't end up being dots this would be useful, otherwise not really.
         bullet.active = true;    // Kinda expensive to do it this way but it's simple
 
@@ -651,8 +549,8 @@ impl AsteroidsEngine {
         for i in 0..self.bullets.len() {
             if self.bullets[i].active {
                 self.bullets[i].position += self.bullets[i].velocity * self.dt;
-                self.bullets[i].position.x = modf(self.bullets[i].position.x, RENDER_WIDTH as f64);
-                self.bullets[i].position.y = modf(self.bullets[i].position.y, RENDER_WIDTH as f64);
+                self.bullets[i].position.x = self.bullets[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
+                self.bullets[i].position.y = self.bullets[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
                 self.bullets[i].lifetime += self.dt;
                 if self.bullets[i].lifetime > 5.0 {
                     self.bullets[i].active = false;
@@ -682,7 +580,7 @@ impl AsteroidsEngine {
 
         asteroid.radius = self.rng.rangef64(4.0, 16.0);
         asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
-        asteroid.position = Vector2::new(self.rng.rangef64(0.0, RENDER_WIDTH as f64), self.rng.rangef64(0.0, RENDER_HEIGHT as f64));
+        asteroid.position = Vector2::new(self.rng.rangef64(0.0, AsteroidsEngine::RENDER_WIDTH as f64), self.rng.rangef64(0.0, AsteroidsEngine::RENDER_HEIGHT as f64));
         asteroid.rotation = self.rng.rangef64(0.0, 6.28);
         asteroid.velocity = Vector2::new(self.rng.rangef64(-1.0, 1.0), self.rng.rangef64(-1.0, 1.0)) * self.rng.rangef64(2.0, 64.0);
         asteroid.active = true;
@@ -699,8 +597,8 @@ impl AsteroidsEngine {
                 asteroids_active += 1;
 
                 self.asteroids[i].position += self.asteroids[i].velocity * self.dt;
-                self.asteroids[i].position.x = modf(self.asteroids[i].position.x, RENDER_WIDTH as f64);
-                self.asteroids[i].position.y = modf(self.asteroids[i].position.y, RENDER_HEIGHT as f64);
+                self.asteroids[i].position.x = self.asteroids[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f64);
+                self.asteroids[i].position.y = self.asteroids[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f64);
 
                 
 
@@ -774,7 +672,6 @@ impl AsteroidsEngine {
 
     pub fn add_score(&mut self, score: i64) {
         self.score += score;
-        self.sf_score.opacity = 255;
     }
 
     pub fn remove_score(&mut self, score: i64) {
@@ -785,22 +682,18 @@ impl AsteroidsEngine {
     }
 
     pub fn draw_score(&mut self) {
-        self.sf_score.text = format!("{:0>8}", self.score);
-        self.sf_score.scale = Vector2::new(10.0, 10.0);
-        self.sf_score.spacing_horizontal = 6.0;
-        self.sf_score.opacity = if self.sf_score.opacity > 32 { self.sf_score.opacity - 1} else { 32 };
-        self.sf_score.position = Vector2::new(8.0, 450.0) / 10.0;
-        self.sf_score.draw(&mut self.rasterizer);
+        self.rasterizer.set_draw_mode(DrawMode::Alpha);
+        self.rasterizer.opacity = 200;
+        self.rasterizer.tint = Color::hsv(self.realtime * 10.0, 1.0, 1.0);
+        self.rasterizer.pprint(&self.font_score, format!("{:0>8}", self.score), 232, 248, 0, None);
+        self.rasterizer.tint = Color::white();
+        self.rasterizer.opacity = 255;
+        self.rasterizer.set_draw_mode(DrawMode::Opaque);
     }
 
-    pub fn draw_performance_text(&mut self, spritefont: &mut SpriteFont) {
+    pub fn draw_performance_text(&mut self) {
         let total_pixels = self.rasterizer.drawn_pixels_since_clear;
-        spritefont.spacing_horizontal = 4.0;
-        spritefont.text = format!("{:.1}ms  ({} UPS) pxd: {}\ncontrols: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number);
-        spritefont.scale = Vector2::new(1.0, 1.0);
-        spritefont.position = Vector2::new(8.0, 8.0);
-        spritefont.opacity = 128;
-        spritefont.draw(&mut self.rasterizer);
+        self.rasterizer.pprint(&self.font_score, format!("{:.1}ms  ({} UPS) PIXELS: {}\nCONTROLS: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number), 8, 8, 7, None);
     }
 
     pub fn draw_debug_collision(&mut self) {
@@ -831,12 +724,13 @@ impl AsteroidsEngine {
         }
         self.dt = self.dt_unscaled * self.timescale;
         self.realtime += self.dt_unscaled;
+        self.present_time -= self.dt_unscaled;
     }
 
     pub fn restart_game(&mut self) {
         self.player.active = true;
-        self.player.position = Vector2::new(RENDER_WIDTH as f64 / 2.0, RENDER_HEIGHT as f64 / 2.0);
-        self.player.velocity = Vector2::zero();
+        self.player.position = Vector2::new(AsteroidsEngine::RENDER_WIDTH as f64 / 2.0, AsteroidsEngine::RENDER_HEIGHT as f64 / 2.0);
+        self.player.velocity = Vector2::ZERO;
         self.player.rotation = 0.0;
 
         for asteroid in &mut self.asteroids {
@@ -855,24 +749,4 @@ impl AsteroidsEngine {
     }
 
     ///// ====== ENGINE ====== /////
-}
-
-pub fn main() {
-    
-    let mut engine = AsteroidsEngine::new();
-    let mut hardware_accelerated: bool = true;
-
-    let args: Vec<_> = std::env::args().collect();
-    for arg in args {
-        match arg.as_str() {
-            "--exclusive" => { engine.video_mode = VideoMode::Exclusive; },
-            "--fullscreen" => { engine.video_mode = VideoMode::Fullscreen; },
-            "--windowed" => { engine.video_mode = VideoMode::Windowed; },
-            "--software-canvas" => { hardware_accelerated = false; }
-            _ => {}
-        }
-    }
-    
-
-    let _error_code = engine.run(hardware_accelerated);
 }

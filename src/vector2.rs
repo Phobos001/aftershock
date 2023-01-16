@@ -1,12 +1,5 @@
 use crate::math::*;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ThreePointOrientation {
-	CounterClockwise,
-	Colinear,
-	Clockwise,
-}
-
 /// Two-dimensional floating-point Vector to be used as either a position or direction.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vector2 {
@@ -23,12 +16,12 @@ impl Vector2 {
 		}
 	}
 
-	pub fn zero() -> Vector2 { Vector2 { x: 0.0, y: 0.0, } }
-	pub fn one() -> Vector2 { Vector2 { x: 1.0, y: 1.0, } }
-	pub fn up() -> Vector2 { Vector2 { x: 0.0, y: -1.0, } }
-	pub fn down() -> Vector2 { Vector2 { x: 0.0, y: 1.0, } }
-	pub fn left() -> Vector2 { Vector2 { x: -1.0, y: 0.0, } }
-	pub fn right() -> Vector2 { Vector2 {x: 1.0, y: 0.0, } }
+	pub const ZERO: 	Vector2 = Vector2 {x:  0.0,  y:  0.0,};
+	pub const ONE: 		Vector2 = Vector2 {x:  1.0,  y:  1.0,};
+	pub const UP: 		Vector2 = Vector2 {x:  0.0,  y: -1.0,};
+	pub const DOWN: 	Vector2 = Vector2 {x:  0.0,  y:  1.0,};
+	pub const LEFT: 	Vector2 = Vector2 {x: -1.0,  y:  0.0,};
+	pub const RIGHT: 	Vector2 = Vector2 {x:  1.0,  y:  0.0,};
 
 	/// Gets the width/height ratio of the vector as a 32-bit float.
 	pub fn ratio(&self) -> f64 {
@@ -116,12 +109,6 @@ impl Vector2 {
 		direction - (normal * Vector2::dot(direction, normal))
 	}
 
-	/// Get orientation of three points
-	pub fn orientation(v1: Vector2, v2: Vector2, v3: Vector2) -> ThreePointOrientation {
-		let orientation = (v2.y - v1.y) * (v3.x - v2.x) - (v2.x - v1.x) * (v3.y - v2.y);
-		if orientation > 0.0 { ThreePointOrientation::Clockwise } else if orientation < 0.0 { ThreePointOrientation::CounterClockwise} else { ThreePointOrientation::Colinear }
-	}
-
 	pub fn reflect(direction: Vector2, normal: Vector2) -> Vector2 {
 		direction - (normal * Vector2::dot(direction, normal) * 2.0)
 	}
@@ -137,6 +124,13 @@ impl Vector2 {
 		Vector2::new(1.0 / self.x, 1.0 / self.y)
 	}
 
+	pub fn point_in_aabb(&self, aabb_point: Vector2, aabb_extents: Vector2) -> bool {
+		self.x > aabb_point.x - aabb_extents.x &&
+		self.x < aabb_point.x + aabb_extents.x &&
+		self.y > aabb_point.y - aabb_extents.y &&
+		self.y < aabb_point.y + aabb_extents.y
+	}
+
 	// Help from https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
 	pub fn intersection_infinite(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> (bool, Vector2) {
 		let a1: f64 = p1_end.y - p1_start.y;
@@ -150,7 +144,7 @@ impl Vector2 {
 		let determinant = a1 * b2 - a2 * b1;
 
 		if determinant == 0.0 { // No intersection: Lines are parallel
-			(false, Vector2::zero())
+			(false, Vector2::ZERO)
 		} else {
 			let point = Vector2::new(
 				(b2 * c1 - b1 * c2) / determinant,
@@ -191,7 +185,7 @@ impl Vector2 {
 			if is_in_ray_direction && is_on_segment && is_in_distance {
 				(true, point)
 			} else {
-				(false, Vector2::zero())
+				(false, Vector2::ZERO)
 			}
 		} else {
 			(false, point)
@@ -259,8 +253,8 @@ impl std::ops::Rem for Vector2 {
 
 	fn rem(self, rhs: Vector2) -> Self {
 		Self {
-			x: modf(self.x, rhs.x),
-			y: modf(self.y, rhs.y),
+			x: self.x.rem_euclid(rhs.x),
+			y: self.y.rem_euclid(rhs.y),
 		}
 	}
 }
@@ -281,8 +275,8 @@ impl std::ops::Rem<f64> for Vector2 {
 
 	fn rem(self, rhs: f64) -> Self {
 		Self {
-			x: modf(self.x, rhs),
-			y: modf(self.y, rhs),
+			x: self.x.rem_euclid(rhs),
+			y: self.y.rem_euclid(rhs),
 		}
 	}
 }
@@ -317,8 +311,8 @@ impl std::ops::MulAssign for Vector2 {
 impl std::ops::RemAssign for Vector2 {
 	fn rem_assign(&mut self, rhs: Vector2) {
 		*self = Self {
-			x: modf(self.x, rhs.x),
-			y: modf(self.y, rhs.y),
+			x: self.x.rem_euclid(rhs.x),
+			y: self.y.rem_euclid(rhs.y),
 		}
 	}
 }
@@ -344,8 +338,8 @@ impl std::ops::DivAssign<f64> for Vector2 {
 impl std::ops::RemAssign<f64> for Vector2 {
 	fn rem_assign(&mut self, rhs: f64) {
 		*self = Self {
-			x: modf(self.x, rhs),
-			y: modf(self.y, rhs),
+			x: self.x.rem_euclid(rhs),
+			y: self.y.rem_euclid(rhs),
 		}
 	}
 }

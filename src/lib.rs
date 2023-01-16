@@ -7,12 +7,10 @@
 #![crate_type = "lib"]
 
 // Core
-pub mod framebuffer;
 pub mod rasterizer;
+pub mod partitioned_rasterizer;
 
 // Assets
-
-pub mod image;
 pub mod font;
 
 // Utilities
@@ -23,11 +21,3 @@ pub mod color;
 // Math 2D
 pub mod vector2;
 pub mod matrix3;
-
-// Math 3D
-pub mod matrix4;
-pub mod vector3;
-
-// 3D Utilities
-// Not public because unfinished
-mod three;

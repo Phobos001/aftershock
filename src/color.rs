@@ -1,7 +1,5 @@
 /// 32-bit Color using  1-byte channels for Red, Green, Blue, and Alpha.
 
-use crate::math::*;
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Color {
 	pub r: u8,
@@ -99,7 +97,7 @@ impl Color {
 	}
 
 	pub fn lerp_rgb(c1: Color, c2: Color, t: f64) -> Color {
-		let tb = (clampf(t, 0.0, 1.0) / 255.0) as u8;
+		let tb = (f64::clamp(t, 0.0, 1.0) / 255.0) as u8;
 		let mut cf: Color = Color::clear();
 
 		cf.r = c1.r + (c2.r - c1.r) * tb;

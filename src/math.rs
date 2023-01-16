@@ -1,25 +1,3 @@
-/// Clamps a 32-bit float between the min and max range.
-pub fn clampf(value: f64, min: f64, max: f64) -> f64 {
-	if value < min { min } else if value > max { max } else { value }
-}
-
-/// Clamps a 32-bit integer between the min and max range.
-pub fn clampi(value: i64, min: i64, max: i64) -> i64 {
-	if value < min { min } else if value > max { max } else { value }
-}
-
-/// Returns the remainder of a division for 32-bit floats
-pub fn modf(value: f64, rhs: f64) -> f64 {
-	//((value % rhs) + rhs) % rhs
-	value.rem_euclid(rhs)
-}
-
-/// Returns the remainder of a division for 32-bit integers
-pub fn modi(value: i64, rhs: i64) -> i64 {
-	//((value % rhs) + rhs) % rhs
-	value.rem_euclid(rhs)
-}
-
 /// Returns a 32-bit float if the value is negative (-1.0), positive (1.0), or zero (0.0)
 pub fn signf(value: f64) -> f64 {
 	if value > 0.0 { 1.0 } else if value < 0.0 { -1.0 } else { 0.0 }

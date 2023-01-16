@@ -1,7 +1,8 @@
-extern crate rusttype;
+//#[cfg(feature = "ttf")]
 
-use crate::image::*;
+
 use crate::color::*;
+use crate::rasterizer::Rasterizer;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -15,10 +16,11 @@ use std::fs::File;
 /// 
 /// The glyph width and height tells the font how big the sections are for the glyphs in the image.
 
+#[derive(Clone)]
 pub struct Font {
 	pub glyphidx: Vec<char>,
 	pub glyphidx_sizes: Vec<FontGlyph>,
-	pub fontimg: Image,
+	pub fontimg: Rasterizer,
 	pub glyph_width: usize,
 	pub glyph_height: usize,
 	pub glyph_spacing: i64,
@@ -28,28 +30,34 @@ pub struct Font {
 impl Font {
 
 	/// Load a font image from disk. The order
-	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i64) -> Font {
+	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i64) -> Result<Font, String> {
 
 		let glyphidx = glyphidxstr.to_string().chars().collect();
 		let glyphidx_sizes: Vec<FontGlyph> = Vec::new();
 
 		
-		let fontimg: Image = Image::new(path_image);
+		let fontimg_result = Rasterizer::new_from_image(path_image);
+		if fontimg_result.is_ok() {
 
-		if fontimg.buffer.len() <= 0 {
-			println!("ERROR - FONT: Font image {} does not exist or could not be loaded!", path_image);
+	
+			Ok(Font {
+				glyphidx,
+				glyphidx_sizes,
+				fontimg: fontimg_result.unwrap(),
+				glyph_width,
+				glyph_height,
+				glyph_spacing,
+			})
+		} else {
+			println!("ERROR - FONT: Font image could not be loaded from path {} !", path_image);
+			Err(format!("ERROR - FONT: Font image could not be loaded from path {} !", path_image))
 		}
 
-		//println!("Font: {} loaded with {}B image size", path_image, fontimg.width * fontimg.height);
+		
+	}
 
-		Font {
-			glyphidx,
-			glyphidx_sizes,
-			fontimg,
-			glyph_width,
-			glyph_height,
-			glyph_spacing,
-		}
+	pub fn default() -> Font {
+		Font { glyphidx: Vec::new(), glyphidx_sizes: Vec::new(), fontimg: Rasterizer::new(0, 0), glyph_width: 0, glyph_height: 0, glyph_spacing: 0 }
 	}
 
 	pub fn new_ttf(path_ttf: &str, glyphidxstr: &str, glyph_spacing: i64, point_size: f32, alpha_threshold: f32) -> Font {
@@ -57,7 +65,7 @@ impl Font {
 		let mut ttf_file = File::open(path_ttf).expect(format!("ERROR - FONT: TTF file {} does not exist!", path_ttf).as_str());
 		let mut ttf_buffer: Vec<u8> = Vec::new();
 
-		let bytecount = ttf_file.read_to_end(&mut ttf_buffer).expect("ERROR - FONT: TTF File could not be read.");
+		let _bytecount = ttf_file.read_to_end(&mut ttf_buffer).expect("ERROR - FONT: TTF File could not be read.");
 
 		let ttf = rusttype::Font::try_from_vec(ttf_buffer).expect(format!("ERROR - FONT: TTF Font {} cannot be constructed. Make sure there is only one font inside the TTF file.", path_ttf).as_str());
 
@@ -87,7 +95,7 @@ impl Font {
             (max_x - min_x) as u32
         };
 
-		let mut fontimg: Image = Image::new_with_size(glyphs_width as usize, glyphs_height as usize);
+		let mut fontimg: Rasterizer = Rasterizer::new(glyphs_width as usize, glyphs_height as usize);
 
 		let mut glyphidx_sizes: Vec<FontGlyph> = Vec::with_capacity(glyphidx.len());
 
