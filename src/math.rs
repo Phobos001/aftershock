@@ -1,3 +1,5 @@
+use crate::vector2::Vector2;
+
 /// Returns a 32-bit float if the value is negative (-1.0), positive (1.0), or zero (0.0)
 pub fn signf(value: f32) -> f32 {
 	if value > 0.0 { 1.0 } else if value < 0.0 { -1.0 } else { 0.0 }
@@ -6,6 +8,16 @@ pub fn signf(value: f32) -> f32 {
 /// Returns a 32-bit integer if the value is negative (-1), positive (1), or zero (0)
 pub fn signi(value: i32) -> i32 {
 	if value > 0 { 1 } else if value < 0 { -1 } else { 0 }
+}
+
+pub fn sign3i (p1x: i32, p1y: i32, p2x: i32, p2y: i32, p3x: i32, p3y: i32) -> i32
+{
+    (p1x - p3x) * (p2y - p3y) - (p2x - p3x) * (p1y - p3y)
+}
+
+pub fn sign3f (p1x: f32, p1y: f32, p2x: f32, p2y: f32, p3x: f32, p3y: f32) -> f32
+{
+    (p1x - p3x) * (p2y - p3y) - (p2x - p3x) * (p1y - p3y)
 }
 
 /// Returns a linearly interpolated 32-bit float between a and b, using t as a percentage of... 'betweenness'?
@@ -54,4 +66,22 @@ pub fn barycentric2(v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) 
 	let bu = 1.0 - bv - bw;
 	
 	(bu, bv, bw)
+}
+
+pub fn barycentric(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> (f32, f32, f32) {
+    let v0 = b - a;
+	let v1 = c - a;
+	let v2 = p - a;
+
+    let d00 = Vector2::dot(v0, v0);
+    let d01 = Vector2::dot(v0, v1);
+    let d11 = Vector2::dot(v1, v1);
+    let d20 = Vector2::dot(v2, v0);
+    let d21 = Vector2::dot(v2, v1);
+    let denom = d00 * d11 - d01 * d01;
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    let u = 1.0 - v - w;
+
+	(u, v, w)
 }

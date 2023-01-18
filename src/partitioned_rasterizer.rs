@@ -9,11 +9,11 @@ use crate::vector2::*;
 // Otherwise the extra setup is not worth the effort
 #[derive(Copy, Clone)]
 pub enum BoundingParallelThreshold {
-	Always 	= 0,
-	High 	= 8192,
-	Medium 	= 16384,
-	Low 	= 32768,
-	VeryLow = 65536,
+	VeryHigh	= 8192,
+	High 		= 16384,
+	Medium 		= 32768,
+	Low 		= 65536,
+	VeryLow 	= 131072,
 }
 
 pub enum PartitionScheme {
@@ -187,8 +187,12 @@ impl PartitionedRasterizer {
 		self.rasterizer.pset(x, y, color);
 	}
 
-	pub fn pget(&mut self, x: i32, y: i32) {
-		self.rasterizer.pget(x, y);
+	pub fn pget(&mut self, x: i32, y: i32) -> Color {
+		self.rasterizer.pget(x, y)
+	}
+
+	pub fn pget_wrap(&mut self, x: i32, y: i32) -> Color {
+		self.rasterizer.pget_wrap(x, y)
 	}
 
 	// Too simple to parallelize

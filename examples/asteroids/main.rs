@@ -1,9 +1,9 @@
 extern crate minifb;
 extern crate sdl2;
 
-mod asteroids_engine;
+mod asteroids;
 
-use asteroids_engine::*;
+use asteroids::*;
 
 pub enum Sdl2VideoMode {
     Windowed,
@@ -34,8 +34,9 @@ pub fn start_minifb(engine: &mut AsteroidsEngine) -> u8 {
         AsteroidsEngine::RENDER_WIDTH,
         AsteroidsEngine::RENDER_HEIGHT,
         WindowOptions {
-            resize: false,
-            scale: Scale::FitScreen,
+            resize: true,
+            scale: Scale::X1,
+            scale_mode: ScaleMode::AspectRatioStretch,
             ..WindowOptions::default()
         },
     ) {
@@ -73,6 +74,7 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
     use sdl2::pixels::{PixelFormatEnum};
     
     let mut hardware_accelerated: bool = false;
+    let mut integer_scaling: bool = true;
     let mut video_mode: Sdl2VideoMode = Sdl2VideoMode::Windowed;
 
     let args: Vec<_> = std::env::args().collect();
@@ -82,6 +84,7 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
             "--fullscreen" => { video_mode = Sdl2VideoMode::Fullscreen; },
             "--windowed" => { video_mode = Sdl2VideoMode::Windowed; },
             "--hardware-canvas" => { hardware_accelerated = true; }
+            "--no-integer-scale" => { integer_scaling = false; }
             _ => {}
         }
     }
@@ -129,7 +132,7 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
     };
 
     let _ = canvas.set_logical_size(AsteroidsEngine::RENDER_WIDTH as u32, AsteroidsEngine::RENDER_HEIGHT as u32);
-    let _ = canvas.set_integer_scale(true);
+    let _ = canvas.set_integer_scale(integer_scaling);
     let texture_creator = canvas.texture_creator();
 
     // This is what we update our buffers to
@@ -145,6 +148,8 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
     let mut event_pump = sdl_context.event_pump().unwrap();
 
     'running: loop {
+        
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} => {
@@ -157,13 +162,14 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
         engine.update();
 
         if engine.present_time <= 0.0 {
+            canvas.clear();
             engine.draw();
 
             let _ = screentex.update(None, &engine.rasterizer.color, (AsteroidsEngine::RENDER_WIDTH * 4) as usize);
             let _ = canvas.copy(&screentex, None, None);
             canvas.present();
 
-            engine.present_time = 1.0 / 120.0;
+            engine.present_time = 1.0 / if hardware_accelerated { 240.0 } else { 120.0 };
         }
     }
     

@@ -1,13 +1,12 @@
 extern crate device_query;
 
+use aftershock::*;
 use aftershock::rasterizer::*;
 use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::font::*;
 use aftershock::matrix3::*;
 use aftershock::math::*;
-
-use squares_rng::SquaresRNG;
 
 use device_query::*;
 
@@ -68,6 +67,7 @@ pub struct Asteroid {
     pub radius: f32,
     pub scale: Vector2,
     pub health: u8,
+    pub split: u32,
 }
 
 impl Asteroid {
@@ -81,10 +81,11 @@ impl Asteroid {
             radius: 0.0,
             scale: Vector2::ONE,
             health: 3,
+            split: 0,
         }
     }
 
-    pub fn generate_shape(radius: f32, rng: &mut SquaresRNG) -> [Vector2; 8] {
+    pub fn generate_shape(radius: f32) -> [Vector2; 8] {
         let mut points: [Vector2; 8] = [
             Vector2::new(1.0, 0.0), // Right
             Vector2::new(0.5, 0.5), // Bottom Right
@@ -100,7 +101,7 @@ impl Asteroid {
         // Does not effect collisions
         for p in points.iter_mut() {
             *p *= radius;
-            *p += Vector2::new(rng.rangef32(-2.0, 2.0), rng.rangef32(-2.0, 2.0));
+            *p += Vector2::new(alea::f32_in_range(-4.0, 4.0), alea::f32_in_range(-4.0, 4.0));
         }
 
         points
@@ -154,19 +155,19 @@ pub struct AsteroidsEngine {
 
     pub paused: bool,
 
-    pub rng: SquaresRNG,
-    pub rng_number: f32,
-
     pub font_score: Font,
+
+    pub pattern_test_image: Rasterizer,
 
     pub debug_collision: bool,
     pub debug_info: bool,
 
     pub realtime: f32,
     pub timescale: f32,
-    pub tics: u64,
-    pub fps: u64,
-    pub fps_print: u64,
+
+    pub profiling_update_time: f64,
+    pub profiling_draw_time: f64,
+
     pub dt: f32,
     pub dt_unscaled: f32,
     
@@ -183,33 +184,34 @@ impl AsteroidsEngine {
     pub fn new() -> AsteroidsEngine {
         println!("== OH BOY ITS ANOTHER ASTEROIDS EXAMPLE ==");
 
-        let rng_seedcounter = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("DONT. FUCK. WITH TIME.").as_secs();
-        let tinyfont_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?*^&()[]<>-+=/\\\"'`~:;,.%abcdefghijklmnopqrstuvwxyz";
-        let tinyfont10_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWZYZ1234567890!?/\\@#$%^&*()[]_-+=\"';:.";
+        // Font images will be read left-to-right, top-to-bottom. 
+        // This will tell the Font what character goes to what part of the image.
+        let tinyfont10_glyphidx = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!?/\\@#$%^&*()[]_-+=\"';:.";
 
-        let rng_key: u64 = 0xd2f6ae576fced215; // Key requires even distribution of 0's and 1's
+
+        let center = Vector2::new(AsteroidsEngine::RENDER_WIDTH as f32 / 2.0, AsteroidsEngine::RENDER_HEIGHT as f32 / 2.0);
+
+        let pattern_test_image: Rasterizer = Rasterizer::new_from_image("shared_assets/patterntest.png").unwrap();
 
         AsteroidsEngine {
             camera: Matrix3::identity(),
             camera_boomzoom: 1.0,
 
-            // Use time in seconds as counter seed, and use the first RNG key in the table.
-            rng: SquaresRNG::new_with_key(rng_seedcounter, rng_key), 
-            rng_number: 0.0,
-
-            player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: Vector2::new(256.0, 256.0), rotation: 0.0, radius: 4.0, scale: Vector2::ONE},
+            player: Player { active: true, velocity: Vector2::new(0.0, 0.0), position: center, rotation: 0.0, radius: 4.0, scale: Vector2::ONE},
             asteroids: [Asteroid::new(); 128],
             bullets: [Bullet::new(); 128],
 
             explosion_particles: [ExplosionParticle::new(); 8192],
 
             score: 0,
-            font_score: Font::new("core/tiny_font10.png", tinyfont10_glyphidx, 10, 10, 1).unwrap(),
+            font_score: Font::new("shared_assets/tiny_font10.png", tinyfont10_glyphidx, 10, 10, 1).unwrap(),
 
             uidx_asteroids: 0,
             uidx_bullets: 0,
 
             rasterizer: Rasterizer::new(AsteroidsEngine::RENDER_WIDTH, AsteroidsEngine::RENDER_HEIGHT),
+
+            pattern_test_image,
 
             controls: 0,
             controls_last: 0,
@@ -225,15 +227,16 @@ impl AsteroidsEngine {
             dt_before: Instant::now(),
             realtime: 0.0,
             timescale: 1.0,
-            tics: 0,
-            fps: 0,
-            fps_print: 0,
+
+            profiling_update_time: 0.0,
+            profiling_draw_time: 0.0,
 
             present_time: 0.0,
 		}
 	}
 
     pub fn update(&mut self) {
+        let update_time_before: f64 = timestamp();
 
         self.update_times();
 
@@ -266,33 +269,42 @@ impl AsteroidsEngine {
             self.update_explosion_particles();
             self.update_camera();
         }
-        
-        // Book keeping
-        self.tics += 1;
-        self.fps += 1;
+
+        let update_time_after: f64 = timestamp();
+
+        self.profiling_update_time = update_time_after - update_time_before;
 
         // Give the processor a break
         std::thread::sleep(std::time::Duration::from_micros(1));
     }
 
     pub fn draw(&mut self) {
+        let draw_time_before: f64 = timestamp();
+
         self.rasterizer.clear();
 
+        // No alpha-compositing or color-multiplication here, just draw directly to framebuffer.
+        self.rasterizer.set_draw_mode(DrawMode::NoOp);
         self.draw_explosion_particles();
 
         self.draw_score();
         self.draw_bullets();
         self.draw_asteroids();
         self.draw_player();
+        self.rasterizer.set_draw_mode(DrawMode::Opaque);
 
         if self.paused {
             self.rasterizer.set_draw_mode(DrawMode::Alpha);
             self.rasterizer.opacity = if self.realtime.rem_euclid(0.5) > 0.25 { 255 } else { 0 };
-            self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::white());
-            self.rasterizer.prectangle(true, 256, 232, 16, 32, Color::white());
+            self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::WHITE);
+            self.rasterizer.prectangle(true, 256, 232, 16, 32, Color::WHITE);
             self.rasterizer.opacity = 255;
             self.rasterizer.set_draw_mode(DrawMode::Opaque);
         }
+        
+        let draw_time_after: f64 = timestamp();
+        self.profiling_draw_time = draw_time_after - draw_time_before;
+        
 
         if self.debug_info {
             self.draw_performance_text();
@@ -301,6 +313,9 @@ impl AsteroidsEngine {
         if self.debug_collision {
             self.draw_debug_collision();
         }
+        
+        
+
     }
 
     pub fn is_control_down(&mut self, control: u8) -> bool {
@@ -440,9 +455,9 @@ impl AsteroidsEngine {
 
         let player_color: Color = {
             if self.player.active {
-                Color::white()
+                Color::WHITE
             } else {
-                Color::red()
+                Color::RED
             }
         };
 
@@ -463,12 +478,12 @@ impl AsteroidsEngine {
         for i in 0..self.explosion_particles.len() {
             if spawn_counter > 0 {
                 if self.explosion_particles[i].radius <= 0.1 {
-                    self.explosion_particles[i].radius = self.rng.rangef32(4.0, 16.0);
+                    self.explosion_particles[i].radius = alea::f32_in_range(4.0, 16.0);
                     self.explosion_particles[i].position = position;
                     self.explosion_particles[i].velocity = Vector2::new(
-                        self.rng.rangef32(-1.0, 1.0),
-                        self.rng.rangef32(-1.0, 1.0)
-                    ) * self.rng.rangef32(8.0, 256.0);
+                        alea::f32_in_range(-1.0, 1.0),
+                        alea::f32_in_range(-1.0, 1.0)
+                    ) * alea::f32_in_range(8.0, 256.0);
                     spawn_counter -= 1;
                 }
             } else {
@@ -563,7 +578,7 @@ impl AsteroidsEngine {
         for bullet in &self.bullets {
             if bullet.active {
                 let mtx_position = self.camera.forward(bullet.position);
-                self.rasterizer.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::white());
+                self.rasterizer.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::WHITE);
             }   
         }
     }
@@ -578,12 +593,36 @@ impl AsteroidsEngine {
     pub fn spawn_asteroid(&mut self) {
         let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
 
-        asteroid.radius = self.rng.rangef32(4.0, 16.0);
-        asteroid.shape = Asteroid::generate_shape(asteroid.radius, &mut self.rng);
-        asteroid.position = Vector2::new(self.rng.rangef32(0.0, AsteroidsEngine::RENDER_WIDTH as f32), self.rng.rangef32(0.0, AsteroidsEngine::RENDER_HEIGHT as f32));
-        asteroid.rotation = self.rng.rangef32(0.0, 6.28);
-        asteroid.velocity = Vector2::new(self.rng.rangef32(-1.0, 1.0), self.rng.rangef32(-1.0, 1.0)) * self.rng.rangef32(2.0, 64.0);
+        // Make size smaller if this asteroid is from a destroyed asteroid.
+        asteroid.radius = alea::f32_in_range(8.0, 32.0);
+        asteroid.shape = Asteroid::generate_shape(asteroid.radius);
+        asteroid.position = Vector2::new(alea::f32_in_range(0.0, AsteroidsEngine::RENDER_WIDTH as f32), alea::f32_in_range(0.0, AsteroidsEngine::RENDER_HEIGHT as f32));
+        asteroid.rotation = alea::f32_in_range(0.0, 6.28);
+        asteroid.velocity = Vector2::new(alea::f32_in_range(-1.0, 1.0), alea::f32_in_range(-1.0, 1.0)) * alea::f32_in_range(2.0, 64.0);
         asteroid.active = true;
+        asteroid.split = 1;
+
+        self.uidx_asteroids += 1;
+    }
+
+    pub fn spawn_asteroid_split(&mut self, original_asteroid_idx: usize, split_count: u32) {
+        let original_radius = self.asteroids[original_asteroid_idx].radius;
+        let original_position = self.asteroids[original_asteroid_idx].position;
+
+        let mut asteroid = &mut self.asteroids[self.uidx_asteroids % self.asteroids.len()];
+        
+
+        // Make size smaller if this asteroid is from a destroyed asteroid.
+        asteroid.radius = original_radius - (alea::f32_in_range(1.0, 4.0) * split_count as f32);
+
+        if asteroid.radius < 2.0 { return; }
+
+        asteroid.shape = Asteroid::generate_shape(asteroid.radius);
+        asteroid.position = original_position;
+        asteroid.rotation = alea::f32_in_range(0.0, 6.28);
+        asteroid.velocity = Vector2::new(alea::f32_in_range(-1.0, 1.0), alea::f32_in_range(-1.0, 1.0)) * alea::f32_in_range(2.0, 64.0);
+        asteroid.active = true;
+        asteroid.split += 1;
 
         self.uidx_asteroids += 1;
     }
@@ -600,7 +639,7 @@ impl AsteroidsEngine {
                 self.asteroids[i].position.x = self.asteroids[i].position.x.rem_euclid(AsteroidsEngine::RENDER_WIDTH as f32);
                 self.asteroids[i].position.y = self.asteroids[i].position.y.rem_euclid(AsteroidsEngine::RENDER_HEIGHT as f32);
 
-                
+                self.asteroids[i].rotation += (self.asteroids[i].velocity.magnitude() / 100.0) * self.dt;
 
                 for j in 0..self.bullets.len() {
                     let bullet = &mut self.bullets[j];
@@ -613,6 +652,17 @@ impl AsteroidsEngine {
                             self.spawn_explosion(self.asteroids[i].position);
 
                             self.add_score(25);
+
+                            if self.asteroids[i].split < 3 {
+                                let split_count: u32 = alea::u32_in_range(2, 4);
+                                for _k in 0..split_count {
+                                    self.spawn_asteroid_split(i, split_count);
+                                }
+                            }
+                            
+                            
+
+                            break;
                         }
                     }
                 }
@@ -620,7 +670,7 @@ impl AsteroidsEngine {
         }
 
         if asteroids_active <= 0 {
-            for _ in 0..8 {
+            for _ in 0..alea::i32_in_range(8, 16) {
                 self.spawn_asteroid();
             }
         }
@@ -649,14 +699,14 @@ impl AsteroidsEngine {
 
                 // Draw lines to rasterizer with wrapping
                 //self.rasterizer.wrapping = true;
-                self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::white());
-                self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::white());
+                self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::WHITE);
+                self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::WHITE);
                 //self.rasterizer.wrapping = false;
             }
             
@@ -685,46 +735,55 @@ impl AsteroidsEngine {
         self.rasterizer.set_draw_mode(DrawMode::Alpha);
         self.rasterizer.opacity = 200;
         self.rasterizer.tint = Color::hsv(self.realtime * 10.0, 1.0, 1.0);
-        self.rasterizer.pprint(&self.font_score, format!("{:0>8}", self.score), 232, 248, 0, None);
-        self.rasterizer.tint = Color::white();
+        self.rasterizer.pprint(&self.font_score, format!("{:0>8}", self.score), self.player.position.x as i32 - 44, self.player.position.y as i32 + 24, 0, None);
+        self.rasterizer.tint = Color::WHITE;
         self.rasterizer.opacity = 255;
         self.rasterizer.set_draw_mode(DrawMode::Opaque);
     }
 
     pub fn draw_performance_text(&mut self) {
         let total_pixels = self.rasterizer.drawn_pixels_since_clear;
-        self.rasterizer.pprint(&self.font_score, format!("{:.1}ms  ({} UPS) PIXELS: {}\nCONTROLS: {}\n{}", (self.dt_unscaled * 100000.0).ceil() / 100.0, self.fps_print, total_pixels, self.controls, self.rng_number), 8, 8, 7, None);
+        self.rasterizer.pprint(&self.font_score, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nPIXELS: {}\nCONTROLS: {}\n", 
+        (self.profiling_update_time * 100000.0).ceil() / 100.0, 
+        (self.profiling_draw_time * 100000.0).ceil() / 100.0,
+        total_pixels, self.controls), 8, 8, 7, None);
     }
 
     pub fn draw_debug_collision(&mut self) {
-        self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::green());
+        self.rasterizer.set_draw_mode(DrawMode::NoOp);
+        self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::GREEN);
 
         for asteroid in &self.asteroids {
             if asteroid.active {
-                self.rasterizer.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::green());
+                self.rasterizer.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::GREEN);
             }
         }
 
         for bullet in &self.bullets {
             if bullet.active {
-                self.rasterizer.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::green());
+                self.rasterizer.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::GREEN);
             }
         }
+        self.rasterizer.set_draw_mode(DrawMode::Opaque);
     }
 
     pub fn update_times(&mut self) {
         let now = Instant::now();
+
         let now_s = (now.elapsed().as_secs() as f32) + (now.elapsed().subsec_nanos() as f32 * 1.0e-9);
         let before_s = (self.dt_before.elapsed().as_secs() as f32) + (self.dt_before.elapsed().subsec_nanos() as f32 * 1.0e-9);
+
         self.dt_unscaled = before_s - now_s;
         
-        self.dt_before = Instant::now();
         if self.dt_unscaled < 0.0 {
             self.dt_unscaled = 0.0;
         }
+
         self.dt = self.dt_unscaled * self.timescale;
         self.realtime += self.dt_unscaled;
         self.present_time -= self.dt_unscaled;
+
+        self.dt_before = Instant::now();
     }
 
     pub fn restart_game(&mut self) {
@@ -748,5 +807,4 @@ impl AsteroidsEngine {
         self.score = 0;
     }
 
-    ///// ====== ENGINE ====== /////
 }

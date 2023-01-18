@@ -10,6 +10,15 @@ pub struct Color {
 
 impl Color {
 
+	pub const CLEAR:	Color = Color { r:   0, g:   0, b:   0, a: 255 };
+	pub const WHITE: 	Color = Color { r: 255, g: 255, b: 255, a: 255 };
+	pub const RED:	 	Color = Color { r: 255, g: 	 0, b:   0, a: 255 };
+	pub const GREEN: 	Color = Color { r:   0, g: 255, b:   0, a: 255 };
+	pub const BLUE: 	Color = Color { r:   0, g:   0, b: 255, a: 255 };
+	pub const MAGENTA: 	Color = Color { r: 255, g:   0, b: 255, a: 255 };
+	pub const YELLOW: 	Color = Color { r: 255, g: 255, b:   0, a: 255 };
+	pub const CYAN: 	Color = Color { r:   0, g: 255, b: 255, a: 255 };
+
 	/// InVeNt NeW cOlOrS
 	pub fn new(r: u8, g: u8, b: u8, a: u8) -> Color {
 		Color {
@@ -19,7 +28,7 @@ impl Color {
 
 	/// Accurate but slow alpha-blending function
 	pub fn blend_slow(src: Color, dst: Color, opacity: f32) -> Color {
-		if src.a <= 0 { return Color::clear(); }
+		if src.a <= 0 { return Color::CLEAR; }
 
 		let src_rf32 = src.r as f32 / 255.0;
 		let src_gf32 = src.g as f32 / 255.0;
@@ -92,13 +101,13 @@ impl Color {
 			3 => { return Color::new((p * 255.0) as u8, (q * 255.0) as u8, (value * 255.0) as u8, 255); },
 			4 => { return Color::new((t * 255.0) as u8, (p * 255.0) as u8, (value * 255.0) as u8, 255); },
 			5 => { return Color::new((value * 255.0) as u8, (p * 255.0) as u8, (q * 255.0) as u8, 255); },
-			_ => { return Color::white(); }
+			_ => { return Color::WHITE; }
 		}
 	}
 
 	pub fn lerp_rgb(c1: Color, c2: Color, t: f32) -> Color {
 		let tb = (f32::clamp(t, 0.0, 1.0) / 255.0) as u8;
-		let mut cf: Color = Color::clear();
+		let mut cf: Color = Color::CLEAR;
 
 		cf.r = c1.r + (c2.r - c1.r) * tb;
 		cf.g = c1.g + (c2.g - c1.g) * tb;
@@ -106,38 +115,6 @@ impl Color {
 		cf.a = c1.a;
 
 		cf
-	}
-
-	pub fn clear() -> Color {
-		Color { r: 0, g: 0, b: 0, a: 0 }
-	}
-
-	pub fn black() -> Color {
-		Color { r: 0, g: 0, b: 0, a: 255 }
-	}
-
-	pub fn white() -> Color {
-		Color { r: 255, g: 255, b: 255, a: 255 }
-	}
-
-	pub fn red() -> Color {
-		Color { r: 255, g: 0, b: 0, a: 255 }
-	}
-
-	pub fn green() -> Color {
-		Color { r: 0, g: 255, b: 0, a: 255 }
-	}
-
-	pub fn blue() -> Color {
-		Color { r: 0, g: 0, b: 255, a: 255 }
-	}
-
-	pub fn yellow() -> Color {
-		Color { r: 255, g: 255, b: 0, a: 255 }
-	}
-
-	pub fn cyan() -> Color {
-		Color { r: 0, g: 255, b: 255, a: 255 }
 	}
 }
 

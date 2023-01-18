@@ -20,3 +20,9 @@ pub mod color;
 // Math 2D
 pub mod vector2;
 pub mod matrix3;
+
+// Profiling shorthand
+pub fn timestamp() -> f64 {
+    use std::time::SystemTime;
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64()
+}

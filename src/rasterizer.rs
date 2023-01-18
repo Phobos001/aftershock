@@ -1,6 +1,7 @@
 use rayon::prelude::*;
 
 use crate::color::*;
+use crate::math;
 use crate::partitioned_rasterizer::PartitionedRasterizer;
 use crate::vector2::*;
 use crate::matrix3::*;
@@ -26,16 +27,6 @@ pub enum DrawMode {
     InvertedOpaque,
     InvertedBgAlpha,
     InvertedBgOpaque,
-    PatternOpaque,
-    PatternAlpha,
-    PatternAddition,
-    PatternSubtraction,
-    PatternMultiply,
-    PatternDivide,
-    PatternInvertedAlpha,
-    PatternInvertedOpaque,
-    PatternInvertedBgAlpha,
-    PatternInvertedBgOpaque,
     // Collect,
 }
 
@@ -223,9 +214,6 @@ fn pset_inverted_bg_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color)
 pub struct Rasterizer {
     pset_op: PSetOp,
 
-    render_next_frame_as_animation: bool,
-    render_next_frame_folder: String,
-
     // For Partitioned Rasterizer
     pub offset_x: usize,
     pub offset_y: usize,
@@ -258,9 +246,6 @@ impl Rasterizer {
         Rasterizer {
             pset_op: pset_opaque,
 
-            render_next_frame_as_animation: false,
-            render_next_frame_folder: "./".to_string(),
-
             offset_x: 0,
             offset_y: 0,
 
@@ -274,7 +259,7 @@ impl Rasterizer {
             camera_matrix: Matrix3::identity(),
 
             draw_mode: DrawMode::Opaque,
-            tint: Color::white(),
+            tint: Color::WHITE,
             opacity: 255,
 
             drawn_pixels_since_clear: 0,
@@ -293,9 +278,6 @@ impl Rasterizer {
 				Ok(Rasterizer {
                     pset_op: pset_opaque,
 
-                    render_next_frame_as_animation: false,
-                    render_next_frame_folder: "./".to_string(),
-
                     width: image.width,
                     height: image.height,
                     color: image.buffer.as_bytes().to_vec(),
@@ -306,7 +288,7 @@ impl Rasterizer {
                     camera_matrix: Matrix3::identity(),
 
                     draw_mode: DrawMode::Opaque,
-                    tint: Color::white(),
+                    tint: Color::WHITE,
                     opacity: 255,
 
                     offset_x: 0,
@@ -349,11 +331,6 @@ impl Rasterizer {
         }
     }
 
-    pub fn save_next_frame_draw_process_until_clear(&mut self, path_to: &str) {
-        self.render_next_frame_as_animation = true;
-        self.render_next_frame_folder = path_to.to_string();
-    }
-
     pub fn into_partitioned(&self) -> PartitionedRasterizer {
         let mut pr = PartitionedRasterizer::new(self.width, self.height, 0);
         pr.rasterizer.blit(self, 0, 0);
@@ -382,7 +359,6 @@ impl Rasterizer {
         }
 
         let stride = 4;
-        // We blit these directly into the color buffer because otherwise we'd just be drawing everything over again and we don't have to worry about depth
         
         // The color array is a 1D row of bytes, so we have to do this in sets of rows
         // Make sure this actually fits inside the buffer
@@ -426,15 +402,14 @@ impl Rasterizer {
     pub fn clear(&mut self) {
         self.color = vec![0; self.width * self.height * 4];
         self.drawn_pixels_since_clear = 0;
-        self.render_next_frame_as_animation = false;
     }
 
     /// Clears the screen to a color.
     /// # Arguments
     /// * 'color' - Color the screen should be cleared too.
     pub fn clear_color(&mut self, color: Color) {
-        let parallel_threshold = 129600;
-        if self.width * self.height > parallel_threshold {
+        // Check if the amount of work is worth parallelizing
+        if self.color.len() > 262144 {
             self.color.par_chunks_exact_mut(4).for_each(|c| {
                 c[0] = color.r;
                 c[1] = color.g;
@@ -449,9 +424,33 @@ impl Rasterizer {
                 c[3] = color.a;
             });
         }
-        
+
         self.drawn_pixels_since_clear = 0;
-        self.render_next_frame_as_animation = false;
+    }
+
+    pub fn tint_buffer(&mut self, color: Color) {
+        // Check if the amount of work is worth parallelizing
+        if self.color.len() > 262144 {
+            self.color.par_chunks_exact_mut(4).for_each(|c| {
+                let color: Color = Color { r: c[0], g: c[1], b: c[2], a: c[3] } * color;
+    
+                c[0] = color.r;
+                c[1] = color.g;
+                c[2] = color.b;
+                c[3] = color.a;
+            });
+        } else {
+            self.color.chunks_exact_mut(4).for_each(|c| {
+                let color: Color = Color { r: c[0], g: c[1], b: c[2], a: c[3] } * color;
+    
+                c[0] = color.r;
+                c[1] = color.g;
+                c[2] = color.b;
+                c[3] = color.a;
+            });
+        }
+
+        
     }
 
     pub fn update_camera(&mut self) {
@@ -500,7 +499,22 @@ impl Rasterizer {
         let out_bottom: bool = y > (self.height) as i32 - 1;
         let out_of_range: bool = idx > (self.width * self.height * 4) - 1;
 
-        if out_of_range || out_left || out_right || out_top || out_bottom  { return Color::clear(); }
+        if out_of_range || out_left || out_right || out_top || out_bottom  { return Color::CLEAR; }
+
+        return Color::new(
+            self.color[idx + 0],
+            self.color[idx + 1],
+            self.color[idx + 2],
+            self.color[idx + 3]
+        );
+    }
+
+    /// Gets a color from the color buffer.
+    pub fn pget_wrap(&self, x: i32, y: i32) -> Color {
+        let x = x.rem_euclid(self.width as i32);
+        let y = y.rem_euclid(self.height as i32);
+
+        let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
 
         return Color::new(
             self.color[idx + 0],
@@ -510,44 +524,30 @@ impl Rasterizer {
         );
     }
     
-    /// Draws a line across two points
+    /// Draws a line across two points using Brensenham Line algorithm from Wikipedia
     pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
-        // Cant find original source but it's been modified for Rust from C or C++
+        let (mut x0, mut y0) = (x0, y0);
 
-        let x0 = i32::clamp(x0, 0, self.width as i32);
-        let x1 = i32::clamp(x1, 0, self.width as i32);
-        let y0 = i32::clamp(y0, 0, self.height as i32);
-        let y1 = i32::clamp(y1, 0, self.height as i32);
-
-        // Create local variables for moving start point
-        let mut x0 = x0;
-        let mut y0 = y0;
-    
-        // Get absolute x/y offset
-        let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
-        let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
-    
-        // Get slopes
-        let sx = if x0 < x1 { 1 } else { -1 };
-        let sy = if y0 < y1 { 1 } else { -1 };
-    
-        // Initialize error
-        let mut err = if dx > dy { dx } else {-dy} / 2;
-        let mut err2;
-    
+        let dx = i32::abs(x1 - x0);
+        let sx = if x0 < x1 {1} else {-1};
+        let dy = -i32::abs(y1 - y0);
+        let sy = if y0 < y1 {1} else {-1};
+        let mut error = dx + dy;
+        
         loop {
-            // Set pixel
             self.pset(x0, y0, color);
-    
-            // Check end condition
-            if x0 == x1 && y0 == y1 { break };
-    
-            // Store old error
-            err2 = 2 * err;
-    
-            // Adjust error and start position
-            if err2 > -dx { err -= dy; x0 += sx; }
-            if err2 < dy { err += dx; y0 += sy; }
+            if x0 == x1 && y0 == y1 { break; }
+            let e2 = 2 * error;
+            if e2 >= dy {
+                if x0 == x1 { break; }
+                error = error + dy;
+                x0 = x0 + sx;
+            }
+            if e2 <= dx {
+                if y0 == y1 { break; }
+                error = error + dx;
+                y0 = y0 + sy;
+            }
         }
     }
     
@@ -574,6 +574,39 @@ impl Rasterizer {
                 self.pset(x0, sides, color);
                 self.pset(x1, sides, color);
             }
+        }
+    }
+
+    /// Draws a triangle directly to the screen.
+    /// Implementation found here: https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
+    pub fn ptriangle(&mut self, filled: bool, x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) {
+        if filled {
+            let xmin = i32::min(x0, i32::min(x1, x2));
+            let xmax = i32::max(x0, i32::max(x1, x2));
+            let ymin = i32::min(y0, i32::min(y1, y2));
+            let ymax = i32::max(y0, i32::max(y1, y2));
+
+            for iy in ymin..ymax {
+                for ix in xmin..xmax {
+
+                    let d1 = math::sign3i(ix, iy, x0, y0, x1, y1);
+                    let d2 = math::sign3i(ix, iy, x1, y1, x2, y2);
+                    let d3 = math::sign3i(ix, iy, x2, y2, x0, y0);
+
+                    let has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                    let has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+                    let is_inside: bool = !(has_neg && has_pos);
+
+                    if is_inside {
+                        self.pset(ix, iy, color);
+                    }
+                }
+            }
+        } else {
+            self.pline(x0, y0, x1, y1, color);
+            self.pline(x0, y0, x2, y2, color);
+            self.pline(x1, y1, x2, y2, color);
         }
     }
     
@@ -751,6 +784,43 @@ impl Rasterizer {
         }
     }
 
+    /// Draws a triangle directly to the screen, using a texture.
+    pub fn ptritex_wrap(&mut self,
+        x0: i32, y0: i32, 
+        x1: i32, y1: i32, 
+        x2: i32, y2: i32,
+        image: &Rasterizer) {
+
+        let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.width as i32);
+        let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.width as i32);
+        let ymin = i32::clamp(i32::min(y0, i32::min(y1, y2)), 0, self.height as i32);
+        let ymax = i32::clamp(i32::max(y0, i32::max(y1, y2)), 0, self.height as i32);
+
+        for iy in ymin..ymax {
+            for ix in xmin..xmax {
+
+                let d1 = math::sign3i(ix, iy, x0, y0, x1, y1);
+                let d2 = math::sign3i(ix, iy, x1, y1, x2, y2);
+                let d3 = math::sign3i(ix, iy, x2, y2, x0, y0);
+
+                let has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                let has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+                let is_inside: bool = !(has_neg && has_pos);
+
+                if is_inside {
+                    // Get where this point would be if transfered to the uv triangle
+
+                    // Get interpolation percent between points
+                    let uv_x = ix;
+                    let uv_y = iy;
+
+                    self.pset(ix, iy, image.pget_wrap(uv_x, uv_y));
+                }
+            }
+        }
+    }
+
     /// Draws text directly to the screen using a provided font.
     pub fn pprint(&mut self, font: &Font, text: String, x: i32, y: i32, newline_space: i32, wrap_width: Option<u32>) {
         let mut jumpx: i32 = 0;
@@ -778,49 +848,14 @@ impl Rasterizer {
         }
     }
 
-    /// Draws a triangle directly to the screen.
-    /// Algorithm written by nusan for the PICO-8 3D Renderer 
-    pub fn ptriangle(&mut self, filled: bool, x1: i32, y1: i32, x2: i32, y2: i32, x3: i32, y3: i32, color: Color) {
-        if filled {
-            // Collect pixels from lines without drawing to the screen
-            let vl12 = self.cline(x1, y1, x2, y2);
-            let vl23 = self.cline(x2, y2, x3, y3);
-            let vl31 = self.cline(x3, y3, x1, y1);
-
-            let mut edge_pixels: Vec<(i32, i32)> = Vec::new();
-            edge_pixels.extend(vl12);
-            edge_pixels.extend(vl23);
-            edge_pixels.extend(vl31);
-  
-
-            let mut scanline_rows: Vec<Vec<(i32, i32)>> = vec![Vec::new(); self.height];
-
-            for p in edge_pixels {
-                if p.1 >= 0 && p.1 < self.height as i32{
-                    scanline_rows[p.1 as usize].push(p);
-                }
-            }
-
-            for row in scanline_rows {
-                if row.len() == 0 { continue; }
-                let height = row[0].1;
-                self.pline(row[0].0, height, row[row.len()-1].0, height, color);
-            }
-        } else {
-            self.pline(x1, y1, x2, y2, color);
-            self.pline(x1, y1, x3, y3, color);
-            self.pline(x2, y2, x3, y3, color);
-        }
-    }
-
     /// Draws a quadratic beizer curve onto the screen.
     pub fn pbeizer(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx: i32, my: i32, color: Color) {
         let mut step: f32 = 0.0;
 
         // Get the maximal number of pixels we will need to use and get its inverse as a step size.
         // Otherwise we don't know how many pixels we will need to draw
-        let stride_c1 = self.cline(x0, y0, mx, my).len() as f32;
-        let stride_c2 = self.cline(mx, my, x1, y1).len() as f32;
+        let stride_c1 = self.cline(x0, y0, mx, my) as f32;
+        let stride_c2 = self.cline(mx, my, x1, y1) as f32;
 
         let stride: f32 = (1.0 / (stride_c1 + stride_c2)) * 0.5;
 
@@ -845,80 +880,35 @@ impl Rasterizer {
         }
     }
 
-    /// Draws a cubic beizer curve onto the screen.
-    pub fn pbeizer_cubic(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, mx0: i32, my0: i32, mx1: i32, my1: i32, color: Color) {
-        let mut step: f32 = 0.0;
+    /// Count pixels in line operation, without drawing anything to the raster.
+    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> u32{
 
-        // Get the maximal number of pixels we will need to use and get its inverse as a step size.
-        // Otherwise we don't know how many pixels we will need to draw
-        let stride_c1: f32 = self.cline(x0, y0, mx0, my0).len() as f32;
-        let stride_c2: f32 = self.cline(mx0, my0, mx1, my1).len() as f32;
-        let stride_c3: f32 = self.cline(mx1, my1, x1, y1).len() as f32;
+        let mut pixel_count: u32 = 0;
 
-        let stride = (1.0 / (stride_c1 + stride_c2 + stride_c3)) * 0.5;
+        let (mut x0, mut y0) = (x0, y0);
 
-        let x0 = x0 as f32;
-        let y0 = x0 as f32;
-        let x1 = x1 as f32;
-        let y1 = y1 as f32;
-        let mx0 = mx0 as f32;
-        let my0 = my0 as f32;
-        let mx1 = mx1 as f32;
-        let my1 = my1 as f32;
-
+        let dx = i32::abs(x1 - x0);
+        let sx = if x0 < x1 {1} else {-1};
+        let dy = -i32::abs(y1 - y0);
+        let sy = if y0 < y1 {1} else {-1};
+        let mut error = dx + dy;
+        
         loop {
-            if step > 1.0 { break; }
-
-            let px0 = f32::clamp(lerpf(x0, mx0, step), 0.0, self.width as f32);
-            let py0 = f32::clamp(lerpf(y0, my0, step), 0.0, self.height as f32);
-
-            let px1 = f32::clamp(lerpf(px0, mx1, step), 0.0, self.width as f32);
-            let py1 = f32::clamp(lerpf(py0, my1, step), 0.0, self.height as f32);
-
-            let px2 = f32::clamp(lerpf(px1, x1, step), 0.0, self.width as f32);
-            let py2 = f32::clamp(lerpf(py1, y1, step), 0.0, self.height as f32);
-
-            self.pset(px2 as i32, py2 as i32, color);
-            step += stride;
-        }
-    }
-
-    /// Returns pixel positions across the line.
-    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
-
-        let mut pixels: Vec<(i32, i32)> = Vec::new();
-
-        // Create local variables for moving start point
-        let mut x0 = x0;
-        let mut y0 = y0;
-
-        // Get absolute x/y offset
-        let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
-        let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
-
-        // Get slopes
-        let sx = if x0 < x1 { 1 } else { -1 };
-        let sy = if y0 < y1 { 1 } else { -1 };
-
-        // Initialize error
-        let mut err = if dx > dy { dx } else {-dy} / 2;
-        let mut err2;
-
-        loop {
-            // Set pixel
-            pixels.push((x0, y0));
-
-            // Check end condition
-            if x0 == x1 && y0 == y1 { break };
-
-            // Store old error
-            err2 = 2 * err;
-
-            // Adjust error and start position
-            if err2 > -dx { err -= dy; x0 += sx; }
-            if err2 < dy { err += dx; y0 += sy; }
+            pixel_count += 1;
+            if x0 == x1 && y0 == y1 { break; }
+            let e2 = 2 * error;
+            if e2 >= dy {
+                if x0 == x1 { break; }
+                error = error + dy;
+                x0 = x0 + sx;
+            }
+            if e2 <= dx {
+                if y0 == y1 { break; }
+                error = error + dx;
+                y0 = y0 + sy;
+            }
         }
 
-        return pixels;
+        return pixel_count;
     }
 }
