@@ -6,7 +6,7 @@ edition = "2021"
 catagories = "graphics"
 keywords = ["graphics", "rendering", "software-rendering", "gamedev"]
 description = "Software Rendering Graphics API written in pure rust"
-license = "MIT"
+license = "MIT / Apache 2.0"
 repository = "https://github.com/Phobos001/aftershock"
 readme = "README.md"
 
