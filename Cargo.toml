@@ -6,7 +6,7 @@ edition = "2021"
 catagories = "graphics"
 keywords = ["graphics", "rendering", "software-rendering", "gamedev"]
 description = "Software Rendering Graphics API written in pure rust"
-license = "MIT / Apache 2.0"
+license = "MIT"
 repository = "https://github.com/Phobos001/aftershock"
 readme = "README.md"
 
@@ -23,13 +23,27 @@ num_cpus = "1.15.0"
 rayon = "1.6.1"
 
 [dev-dependencies]
-sdl2 = "0.35.2"
+sdl2 = {version = "0.35.2", features = ["static-link", "use-pkgconfig"] }
 minifb = "0.23.0"
 device_query = "1.1.2"
-alea = "0.2.2" # Used in asteroids example
+alea = "0.2.2"
+soloud = "1.0.2"
+dashmap = {version = "5.4.0", features = {"inline", "serde", "rayon"}}
+
+[profile.dev]
+opt-level = 3
+
 
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 
+
+[package.metadata.vcpkg]
+dependencies = ["sdl2"]
+git = "https://github.com/microsoft/vcpkg"
+rev = "261c458af6e3eed5d099144aff95d2b5035f656b"
+
+[package.metadata.vcpkg.target]
+x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }

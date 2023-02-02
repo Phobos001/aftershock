@@ -1,4 +1,4 @@
-use crate::rasterizer::*;
+use crate::buffer::*;
 use crate::color::*;
 
 use std::thread::*;
@@ -29,19 +29,19 @@ pub enum PartitionScheme {
 	Split8x8,
 }
 
-pub struct PartitionedRasterizer {
-	pub rasterizer: Rasterizer,
-	pub partitions: Vec<Rasterizer>,
+pub struct PartitionedBuffer {
+	pub buffer: Buffer,
+	pub partitions: Vec<Buffer>,
 	pub scheme: PartitionScheme,
 	pub threshold: BoundingParallelThreshold,
 }
 
-/// A rasterizer that allows for parallel rendering by partioning the image into smaller pieces, usually by how many cores the current CPU has.
-impl PartitionedRasterizer {
-	pub fn new(width: usize, height: usize, cores: usize) -> PartitionedRasterizer {
+/// A Buffer that allows for parallel rendering by partioning the image into smaller pieces, usually by how many cores the current CPU has.
+impl PartitionedBuffer {
+	pub fn new(width: usize, height: usize, cores: usize) -> PartitionedBuffer {
 	
-		let mut pr = PartitionedRasterizer {
-			rasterizer: Rasterizer::new(width, height),
+		let mut pr = PartitionedBuffer {
+			buffer: Buffer::new(width, height),
 			partitions:  Vec::new(),
 			scheme: PartitionScheme::Full,
 			threshold: BoundingParallelThreshold::Low,
@@ -52,29 +52,29 @@ impl PartitionedRasterizer {
 	}
 
 	// For some reason Result doesn't work here????
-	pub fn new_from_image(path_to: &str) -> PartitionedRasterizer {
+	pub fn new_from_image(path_to: &str) -> PartitionedBuffer {
 		match lodepng::decode32_file(path_to) {
 			Ok(image) => {
 				//println!("Image: {}, Res: {} x {}, Size: {}B", path_to, image.width, image.height, image.buffer.len());
 				let buffer_new: Vec<u8> =  image.buffer.as_bytes().to_vec();
                 use rgb::*;
 
-				let mut pr = PartitionedRasterizer::new(image.width, image.height, 0);
-				pr.rasterizer.color = buffer_new;
+				let mut pr = PartitionedBuffer::new(image.width, image.height, 0);
+				pr.buffer.color = buffer_new;
 				pr.generate_partitions();
 
 				pr
 			},
 			Err(reason) => {
 				println!("ERROR - IMAGE: Could not load {} | {}", path_to, reason);
-				PartitionedRasterizer::new(1, 1, 1)
+				PartitionedBuffer::new(1, 1, 1)
 			}
 		}
 	}
 
-	pub fn get_pixels_since_clear(&self) -> u64 {
-		let mut total: u64 = 0;
-		total += self.rasterizer.drawn_pixels_since_clear;
+	pub fn get_pixels_since_clear(&self) -> u32 {
+		let mut total: u32 = 0;
+		total += self.buffer.drawn_pixels_since_clear;
 		for part in &self.partitions {
 			total += part.drawn_pixels_since_clear;
 		}
@@ -82,14 +82,14 @@ impl PartitionedRasterizer {
 	}
 
 	pub fn clear(&mut self) {
-		self.rasterizer.clear();
+		self.buffer.clear();
 		for part in &mut self.partitions {
 			part.clear();
 		}
 	}
 
 	pub fn clear_color(&mut self, color: Color) {
-		self.rasterizer.clear_color(color);
+		self.buffer.clear_color(color);
 		for part in &mut self.partitions {
 			part.clear_color(color);
 		}
@@ -102,7 +102,7 @@ impl PartitionedRasterizer {
 
 		let mut scheme: PartitionScheme = match cpu_count {
 			1 => { PartitionScheme::Full },
-			2 => { if self.rasterizer.height > self.rasterizer.width { PartitionScheme::Split2x1 } else { PartitionScheme::Split1x2 }},
+			2 => { if self.buffer.height > self.buffer.width { PartitionScheme::Split2x1 } else { PartitionScheme::Split1x2 }},
 			3 => { PartitionScheme::Split3x1 }
 			4 => { PartitionScheme::Split2x2 },
 			5 => { PartitionScheme::Split2x2 },
@@ -126,78 +126,78 @@ impl PartitionedRasterizer {
 	}
 
 	pub fn set_draw_mode(&mut self, mode: DrawMode) {
-		self.rasterizer.set_draw_mode(mode);
+		self.buffer.set_draw_mode(mode);
 		for part in &mut self.partitions {
 			part.set_draw_mode(mode);
 		}
 	}
 
 	pub fn set_tint(&mut self, color: Color) {
-		self.rasterizer.tint = color;
+		self.buffer.tint = color;
 		for part in &mut self.partitions {
 			part.tint = color;
 		}
 	}
 
 	pub fn set_opacity(&mut self, opacity: u8) {
-		self.rasterizer.opacity = opacity;
+		self.buffer.opacity = opacity;
 		for part in &mut self.partitions {
 			part.opacity = opacity;
 		}
 	}
 
 	pub fn set_camera_position(&mut self, x: f32, y: f32) {
-		self.rasterizer.camera_position = Vector2::new(x, y);
+		self.buffer.camera_position = Vector2::new(x, y);
 		for part in &mut self.partitions {
 			part.camera_position = Vector2::new(x, y);
 		}
 	}
 
 	pub fn set_camera_rotation(&mut self, rotation: f32) {
-		self.rasterizer.camera_rotation = rotation;
+		self.buffer.camera_rotation = rotation;
 		for part in &mut self.partitions {
 			part.camera_rotation = rotation;
 		}
 	}
 
 	pub fn set_camera_scale(&mut self, x: f32, y: f32) {
-		self.rasterizer.camera_scale = Vector2::new(x, y);
+		self.buffer.camera_scale = Vector2::new(x, y);
 		for part in &mut self.partitions {
 			part.camera_scale = Vector2::new(x, y);
 		}
 	}
 
 	pub fn update_camera(&mut self) {
-		self.rasterizer.update_camera();
+		self.buffer.update_camera();
 		for part in &mut self.partitions {
 			part.update_camera();
 		}
 	}
 
 	pub fn resize(&mut self, width: usize, height: usize) {
-		self.rasterizer.resize(width, height);
+		self.buffer.resize(width, height);
 		self.generate_partitions();
 	}
 
-	pub fn blit(&mut self, image: &Rasterizer, x: i32, y: i32) {
-		self.rasterizer.blit(image, x, y);
+	pub fn blit(&mut self, image: &Buffer, x: i32, y: i32) {
+		self.buffer.blit(image, x, y);
 	}
 
 	pub fn pset(&mut self, x: i32, y: i32, color: Color) {
-		self.rasterizer.pset(x, y, color);
+		self.buffer.pset(x, y, color);
 	}
 
 	pub fn pget(&mut self, x: i32, y: i32) -> Color {
-		self.rasterizer.pget(x, y)
+		self.buffer.pget(x, y)
 	}
 
 	pub fn pget_wrap(&mut self, x: i32, y: i32) -> Color {
-		self.rasterizer.pget_wrap(x, y)
+		self.buffer.pget_wrap(x, y)
 	}
 
 	// Too simple to parallelize
 	pub fn pline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
-		self.rasterizer.pline(x0, y0, x1, y1, color);
+		self.buffer.pline(x0, y0, x1, y1, color);
 	}
 
 	pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, width: i32, height: i32, color: Color) {
@@ -206,7 +206,7 @@ impl PartitionedRasterizer {
 		// Run in parallel
 		if filled && total_area >= self.threshold as i32 {
 			scope(|s| {
-				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
 				for part in & mut self.partitions {
 	
@@ -226,14 +226,14 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pcircle function!")
 					}
 				}
 			})
 		} else { // Just lines
-			self.rasterizer.prectangle(filled, x, y, width, height, color);
+			self.buffer.prectangle(filled, x, y, width, height, color);
 		}
 	}
 
@@ -243,7 +243,7 @@ impl PartitionedRasterizer {
 		// Run in parallel
 		if total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
-				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
 				for part in & mut self.partitions {
 					//let mut part_clone = part.clone();
@@ -264,7 +264,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pcircle function!")
 					}
@@ -272,11 +272,11 @@ impl PartitionedRasterizer {
 			})
 			
 		} else {
-			self.rasterizer.pcircle(filled, xc, yc, radius, color);
+			self.buffer.pcircle(filled, xc, yc, radius, color);
 		}
 	}
 
-	pub fn pimg(&mut self, image: &Rasterizer, x: i32, y: i32) {
+	pub fn pimg(&mut self, image: &Buffer, x: i32, y: i32) {
 
 		let width = image.width;
 		let height = image.height;
@@ -286,7 +286,7 @@ impl PartitionedRasterizer {
 		// Run in parallel
 		if total_area >= self.threshold as i32 {
 			scope(|s| {
-				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
 				for part in &mut self.partitions {
 
@@ -307,7 +307,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimg function!")
 					}
@@ -315,12 +315,12 @@ impl PartitionedRasterizer {
 			})
 			
 		} else {
-			self.rasterizer.pimg(&image, x, y);
+			self.buffer.pimg(&image, x, y);
 		}
 		
 	}
 
-	pub fn pimgrect(&mut self, image: &Rasterizer, x: i32, y: i32, ix: i32, iy: i32, iw: i32, ih: i32) {
+	pub fn pimgrect(&mut self, image: &Buffer, x: i32, y: i32, ix: i32, iy: i32, iw: i32, ih: i32) {
 
 		let width = image.width;
 		let height = image.height;
@@ -330,7 +330,7 @@ impl PartitionedRasterizer {
 		// Run in parallel
 		if total_area >= self.threshold as i32 {
 			scope(|s| {
-				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
 				for part in &mut self.partitions {
 
@@ -351,7 +351,7 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimg function!")
 					}
@@ -359,12 +359,12 @@ impl PartitionedRasterizer {
 			})
 			
 		} else {
-			self.rasterizer.pimg(&image, x, y);
+			self.buffer.pimg(&image, x, y);
 		}
 		
 	}
 
-	pub fn pimgmtx(&mut self, image: &Rasterizer, x: f32, y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
+	pub fn pimgmtx(&mut self, image: &Buffer, x: f32, y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
 
 		let width = image.width;
 		let height = image.height;
@@ -375,7 +375,7 @@ impl PartitionedRasterizer {
 		if total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
 
-				let mut join_handles: Vec<ScopedJoinHandle<&mut Rasterizer>> = Vec::new();
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 
 				// First pass: Find all regions that contain the image
 				for part in &mut self.partitions {
@@ -395,17 +395,17 @@ impl PartitionedRasterizer {
 					let part_return = handle.join();
 					if part_return.is_ok() {
 						let part = part_return.unwrap();
-						self.rasterizer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
 					} else {
 						println!("ERROR - THREAD PANIC: Partition failed in pimgmtx function!")
 					}
 				}
 				
-				//self.rasterizer.prectangle(false, rsx as i32, rsy as i32, (rex - rsx) as i32, (rey - rsy) as i32, Color::blue());
+				//self.buffer.prectangle(false, rsx as i32, rsy as i32, (rex - rsx) as i32, (rey - rsy) as i32, Color::blue());
 			})
 			
 		} else {
-			self.rasterizer.pimgmtx(&image, x, y, rotation, scale_x, scale_y, offset_x, offset_y);
+			self.buffer.pimgmtx(&image, x, y, rotation, scale_x, scale_y, offset_x, offset_y);
 		}
 		
 	}
@@ -415,8 +415,8 @@ impl PartitionedRasterizer {
 		self.partitions.clear();
 		/*let mut divx = min_pixel_size;
 
-		for i in min_pixel_size..self.rasterizer.width {
-			if (self.rasterizer.width % i) == 0 {
+		for i in min_pixel_size..self.buffer.width {
+			if (self.buffer.width % i) == 0 {
 				divx = i;
 				break;
 			} 
@@ -424,18 +424,18 @@ impl PartitionedRasterizer {
 
 		let mut divy = min_pixel_size;
 
-		for i in min_pixel_size..self.rasterizer.height {
-			if (self.rasterizer.height % i) == 0 {
+		for i in min_pixel_size..self.buffer.height {
+			if (self.buffer.height % i) == 0 {
 				divy = i;
 				break;
 			} 
 		}
 
-		let (cx, cy) = (self.rasterizer.width / divx, self.rasterizer.height / divy);
+		let (cx, cy) = (self.buffer.width / divx, self.buffer.height / divy);
 
 		for y in 0..cy {
 			for x in 0..cx {
-				let mut r = Rasterizer::new(divx, divy);
+				let mut r = Buffer::new(divx, divy);
 				r.offset_x = x * divx;
 				r.offset_y = y * divy;
 				self.partitions.push(r);
@@ -458,7 +458,7 @@ impl PartitionedRasterizer {
 
 	pub fn draw_debug_view(&mut self) {
 		for part in &self.partitions {
-			self.rasterizer.pline(
+			self.buffer.pline(
 				part.offset_x as i32, 
 				part.offset_y as i32, 
 				(part.offset_x + part.width)  as i32, 
@@ -466,7 +466,7 @@ impl PartitionedRasterizer {
 				Color::new(255, 0, 255, 255)
 			);
 
-			self.rasterizer.pline(
+			self.buffer.pline(
 				part.offset_x as i32, 
 				part.offset_y as i32, 
 				part.offset_x  as i32, 
@@ -477,16 +477,16 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_full(&mut self) {
-		self.partitions.push(Rasterizer::new(self.rasterizer.width, self.rasterizer.height));
+		self.partitions.push(Buffer::new(self.buffer.width, self.buffer.height));
 	}
 
 	fn partition_split_vertical(&mut self) {
-		let mut left_half: Rasterizer = Rasterizer::new(self.rasterizer.width / 2, self.rasterizer.height);
+		let mut left_half: Buffer = Buffer::new(self.buffer.width / 2, self.buffer.height);
 		left_half.offset_x = 0;
 		left_half.offset_y = 0;
 
-		let mut right_half: Rasterizer = Rasterizer::new(self.rasterizer.width / 2, self.rasterizer.height);
-		right_half.offset_x = self.rasterizer.width / 2;
+		let mut right_half: Buffer = Buffer::new(self.buffer.width / 2, self.buffer.height);
+		right_half.offset_x = self.buffer.width / 2;
 		right_half.offset_y = 0;
 
 		self.partitions.push(left_half);
@@ -494,25 +494,25 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_horizontal(&mut self) {
-		let mut top_half: Rasterizer = Rasterizer::new(self.rasterizer.width, self.rasterizer.height / 2);
+		let mut top_half: Buffer = Buffer::new(self.buffer.width, self.buffer.height / 2);
 		top_half.offset_x = 0;
 		top_half.offset_y = 0;
 
-		let mut bottom_half: Rasterizer = Rasterizer::new(self.rasterizer.width, self.rasterizer.height / 2);
+		let mut bottom_half: Buffer = Buffer::new(self.buffer.width, self.buffer.height / 2);
 		bottom_half.offset_x = 0;
-		bottom_half.offset_y = self.rasterizer.height / 2;
+		bottom_half.offset_y = self.buffer.height / 2;
 
 		self.partitions.push(top_half);
 		self.partitions.push(bottom_half);
 	}
 
 	fn partition_split_2x2(&mut self) {
-		let cell_x = self.rasterizer.width / 2;
-		let cell_y = self.rasterizer.height / 2;
+		let cell_x = self.buffer.width / 2;
+		let cell_y = self.buffer.height / 2;
 
 		for y in 0..2 {
 			for x in 0..2 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);
@@ -521,32 +521,32 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_3x1(&mut self) {
-		let cell_x = self.rasterizer.width / 3;
-		let cell_y = self.rasterizer.height;
+		let cell_x = self.buffer.width / 3;
+		let cell_y = self.buffer.height;
 
-		let mut r = Rasterizer::new(cell_x, cell_y);
+		let mut r = Buffer::new(cell_x, cell_y);
 		r.offset_x = 0;
 		r.offset_y = 0;
 		self.partitions.push(r);
 
-		let mut r = Rasterizer::new(cell_x, cell_y);
+		let mut r = Buffer::new(cell_x, cell_y);
 		r.offset_x = cell_x;
 		r.offset_y = 0;
 		self.partitions.push(r);
 
-		let mut r = Rasterizer::new(cell_x, cell_y);
+		let mut r = Buffer::new(cell_x, cell_y);
 		r.offset_x = cell_x * 2;
 		r.offset_y = 0;
 		self.partitions.push(r);
 	}
 
 	fn partition_split_3x2(&mut self) {
-		let cell_x = self.rasterizer.width / 3;
-		let cell_y = self.rasterizer.height / 2;
+		let cell_x = self.buffer.width / 3;
+		let cell_y = self.buffer.height / 2;
 
 		for y in 0..2 {
 			for x in 0..3 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);
@@ -555,12 +555,12 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_3x3(&mut self) {
-		let cell_x = self.rasterizer.width / 3;
-		let cell_y = self.rasterizer.height / 3;
+		let cell_x = self.buffer.width / 3;
+		let cell_y = self.buffer.height / 3;
 
 		for y in 0..3 {
 			for x in 0..3 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);
@@ -569,12 +569,12 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_4x4(&mut self) {
-		let cell_x = self.rasterizer.width / 4;
-		let cell_y = self.rasterizer.height / 4;
+		let cell_x = self.buffer.width / 4;
+		let cell_y = self.buffer.height / 4;
 
 		for y in 0..4 {
 			for x in 0..4 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);
@@ -583,12 +583,12 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_5x5(&mut self) {
-		let cell_x = self.rasterizer.width / 5;
-		let cell_y = self.rasterizer.height / 5;
+		let cell_x = self.buffer.width / 5;
+		let cell_y = self.buffer.height / 5;
 
 		for y in 0..5 {
 			for x in 0..5 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);
@@ -597,12 +597,12 @@ impl PartitionedRasterizer {
 	}
 
 	fn partition_split_8x8(&mut self) {
-		let cell_x = self.rasterizer.width / 8;
-		let cell_y = self.rasterizer.height / 8;
+		let cell_x = self.buffer.width / 8;
+		let cell_y = self.buffer.height / 8;
 
 		for y in 0..8 {
 			for x in 0..8 {
-				let mut r = Rasterizer::new(cell_x, cell_y);
+				let mut r = Buffer::new(cell_x, cell_y);
 				r.offset_x = cell_x * x;
 				r.offset_y = cell_y * y;
 				self.partitions.push(r);

@@ -50,6 +50,73 @@ pub fn cross2(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
 	(x0 * y1) - (y0 * x1)
 }
 
+pub fn determinant(a: f32, b: f32, c: f32, d: f32) -> f32 {
+	a * d - b * c
+}
+
+
+
+pub fn intersection(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> Option<Vector2> {
+	let a1: f32 = p1_end.y - p1_start.y;
+	let b1: f32 = p1_start.x - p1_end.x;
+	let c1: f32 = a1 * p1_start.x + b1 * p1_start.y;
+
+	let a2: f32 = p2_end.y - p2_start.y;
+	let b2: f32 = p2_start.x - p2_end.x;
+	let c2: f32 = a2 * p2_start.x + b2 * p2_start.y;
+
+	let determinant = a1 * b2 - a2 * b1;
+
+	if determinant == 0.0 { // No intersection: Lines are parallel
+		None
+	} else {
+		let point = Vector2::new(
+			(b2 * c1 - b1 * c2) / determinant,
+			(a1 * c2 - a2 * c1) / determinant
+		);
+		Some(point)
+	}
+}
+
+pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> Option<Vector2> {
+
+	// Check for any intersection at all
+	let intersection_opt = intersection(ray_start, ray_end, line_start, line_end);
+
+	if intersection_opt.is_some() {
+		let point = intersection_opt.unwrap();
+
+		// First make sure the point is along the segment; between the start and end
+		let error_margin: f32 = 0.00001;
+
+		let dist_line = Vector2::distance(line_start, line_end);
+		let dist_point_to_line_start = Vector2::distance(line_start, point);
+		let dist_point_to_line_end = Vector2::distance(line_end, point);			
+
+		let diff = dist_line - (dist_point_to_line_start + dist_point_to_line_end);
+		let is_on_segment = diff < error_margin && diff > -error_margin;
+
+		// Now make sure the intersected line is actually in front of the ray direction
+		// Otherwise intersections can occur on lines behind the ray and be incorrect
+
+		let is_in_ray_direction = Vector2::dot(
+			Vector2::direction(ray_start, ray_end), 
+			Vector2::direction(ray_start, point)
+		) > 0.0;
+
+		// Finally make sure the point is in the distance of the rays magnitude
+		let is_in_distance = Vector2::distance(ray_start, point) < Vector2::distance(ray_start, ray_end);
+
+		if is_in_ray_direction && is_on_segment && is_in_distance {
+			Some(point)
+		} else {
+			None
+		}
+	} else {
+		None
+	}
+}
+
 pub fn barycentric2(v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> (f32, f32, f32) {
 	let b0 = (v2x - v1x, v2y - v1y);
 	let b1 = (v3x - v1x, v3y - v1y);

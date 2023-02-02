@@ -53,7 +53,7 @@ pub fn start_minifb(engine: &mut AsteroidsEngine) -> u8 {
         if engine.present_time <= 0.0 {
             engine.draw();
 
-            let colors_u32: Vec<u32> = engine.rasterizer.color.chunks_exact(4)
+            let colors_u32: Vec<u32> = engine.screen.color.chunks_exact(4)
             .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
             .collect();
     
@@ -165,7 +165,7 @@ pub fn start_sdl2(engine: &mut AsteroidsEngine) {
             canvas.clear();
             engine.draw();
 
-            let _ = screentex.update(None, &engine.rasterizer.color, (AsteroidsEngine::RENDER_WIDTH * 4) as usize);
+            let _ = screentex.update(None, &engine.screen.color, (AsteroidsEngine::RENDER_WIDTH * 4) as usize);
             let _ = canvas.copy(&screentex, None, None);
             canvas.present();
 

@@ -74,6 +74,27 @@ impl Vector2 {
 		v1.x * v2.y - v1.y * v2.x
 	}
 
+	pub fn rounded(&self) -> Vector2 {
+		Vector2::new(
+			self.x.round(),
+			self.y.round(),
+		)
+	}
+
+	pub fn ceiled(&self) -> Vector2 {
+		Vector2::new(
+			self.x.ceil(),
+			self.y.ceil(),
+		)
+	}
+
+	pub fn floored(&self) -> Vector2 {
+		Vector2::new(
+			self.x.floor(),
+			self.y.floor(),
+		)
+	}
+
 	/// Returns the 2D distance between two points.
 	pub fn distance(v1: Vector2, v2: Vector2) -> f32 {
 		((v2.x - v1.x).powf(2.0) + (v2.y - v1.y).powf(2.0)).sqrt()
@@ -132,7 +153,7 @@ impl Vector2 {
 	}
 
 	// Help from https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
-	pub fn intersection_infinite(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> (bool, Vector2) {
+	pub fn intersection_infinite(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> Option<Vector2> {
 		let a1: f32 = p1_end.y - p1_start.y;
 		let b1: f32 = p1_start.x - p1_end.x;
 		let c1: f32 = a1 * p1_start.x + b1 * p1_start.y;
@@ -144,22 +165,23 @@ impl Vector2 {
 		let determinant = a1 * b2 - a2 * b1;
 
 		if determinant == 0.0 { // No intersection: Lines are parallel
-			(false, Vector2::ZERO)
+			None
 		} else {
 			let point = Vector2::new(
 				(b2 * c1 - b1 * c2) / determinant,
 				(a1 * c2 - a2 * c1) / determinant
 			);
-			(true, point)
+			Some(point)
 		}
 	}
 
-	pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> (bool, Vector2) {
+	pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> Option<Vector2> {
 
 		// Check for any intersection at all
-		let (intersection_hit, point) = Vector2::intersection_infinite(ray_start, ray_end, line_start, line_end);
+		let intersection_hit = Vector2::intersection_infinite(ray_start, ray_end, line_start, line_end);
 
-		if intersection_hit {
+		if intersection_hit.is_some() {
+			let point = intersection_hit.unwrap();
 
 			// First make sure the point is along the segment; between the start and end
 			let error_margin: f32 = 0.00001;
@@ -183,12 +205,12 @@ impl Vector2 {
 			let is_in_distance = Vector2::distance(ray_start, point) < Vector2::distance(ray_start, ray_end);
 
 			if is_in_ray_direction && is_on_segment && is_in_distance {
-				(true, point)
+				Some(point)
 			} else {
-				(false, Vector2::ZERO)
+				None
 			}
 		} else {
-			(false, point)
+			None
 		}
 	}
 }

@@ -7,8 +7,8 @@
 #![crate_type = "lib"]
 
 // Core
-pub mod rasterizer;
-pub mod partitioned_rasterizer;
+pub mod buffer;
+pub mod partitioned_buffer;
 
 // Assets
 pub mod font;

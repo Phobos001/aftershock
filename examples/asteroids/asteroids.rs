@@ -1,7 +1,7 @@
 extern crate device_query;
 
 use aftershock::*;
-use aftershock::rasterizer::*;
+use aftershock::buffer::*;
 use aftershock::vector2::*;
 use aftershock::color::*;
 use aftershock::font::*;
@@ -66,7 +66,7 @@ pub struct Asteroid {
     pub rotation: f32,
     pub radius: f32,
     pub scale: Vector2,
-    pub health: u8,
+    pub health: i8,
     pub split: u32,
 }
 
@@ -147,7 +147,7 @@ pub struct AsteroidsEngine {
     pub uidx_asteroids: usize,
     pub uidx_bullets: usize,
 
-    pub rasterizer: Rasterizer,
+    pub screen: Buffer,
 
     pub controls: u8,
     pub controls_last: u8,
@@ -157,7 +157,7 @@ pub struct AsteroidsEngine {
 
     pub font_score: Font,
 
-    pub pattern_test_image: Rasterizer,
+    pub pattern_test_image: Buffer,
 
     pub debug_collision: bool,
     pub debug_info: bool,
@@ -191,7 +191,7 @@ impl AsteroidsEngine {
 
         let center = Vector2::new(AsteroidsEngine::RENDER_WIDTH as f32 / 2.0, AsteroidsEngine::RENDER_HEIGHT as f32 / 2.0);
 
-        let pattern_test_image: Rasterizer = Rasterizer::new_from_image("shared_assets/patterntest.png").unwrap();
+        let pattern_test_image: Buffer = Buffer::new_from_image("shared_assets/patterntest.png").unwrap();
 
         AsteroidsEngine {
             camera: Matrix3::identity(),
@@ -209,7 +209,7 @@ impl AsteroidsEngine {
             uidx_asteroids: 0,
             uidx_bullets: 0,
 
-            rasterizer: Rasterizer::new(AsteroidsEngine::RENDER_WIDTH, AsteroidsEngine::RENDER_HEIGHT),
+            screen: Buffer::new(AsteroidsEngine::RENDER_WIDTH, AsteroidsEngine::RENDER_HEIGHT),
 
             pattern_test_image,
 
@@ -281,25 +281,25 @@ impl AsteroidsEngine {
     pub fn draw(&mut self) {
         let draw_time_before: f64 = timestamp();
 
-        self.rasterizer.clear();
+        self.screen.clear();
 
         // No alpha-compositing or color-multiplication here, just draw directly to framebuffer.
-        self.rasterizer.set_draw_mode(DrawMode::NoOp);
+        self.screen.set_draw_mode(DrawMode::NoOp);
         self.draw_explosion_particles();
 
         self.draw_score();
         self.draw_bullets();
         self.draw_asteroids();
         self.draw_player();
-        self.rasterizer.set_draw_mode(DrawMode::Opaque);
+        self.screen.set_draw_mode(DrawMode::Opaque);
 
         if self.paused {
-            self.rasterizer.set_draw_mode(DrawMode::Alpha);
-            self.rasterizer.opacity = if self.realtime.rem_euclid(0.5) > 0.25 { 255 } else { 0 };
-            self.rasterizer.prectangle(true, 232, 232, 16, 32, Color::WHITE);
-            self.rasterizer.prectangle(true, 256, 232, 16, 32, Color::WHITE);
-            self.rasterizer.opacity = 255;
-            self.rasterizer.set_draw_mode(DrawMode::Opaque);
+            self.screen.set_draw_mode(DrawMode::Alpha);
+            self.screen.opacity = if self.realtime.rem_euclid(0.5) > 0.25 { 255 } else { 0 };
+            self.screen.prectangle(true, 232, 232, 16, 32, Color::WHITE);
+            self.screen.prectangle(true, 256, 232, 16, 32, Color::WHITE);
+            self.screen.opacity = 255;
+            self.screen.set_draw_mode(DrawMode::Opaque);
         }
         
         let draw_time_after: f64 = timestamp();
@@ -451,7 +451,7 @@ impl AsteroidsEngine {
         let mtx_line2 = mtx.forward(player_points[2]);
         let mtx_line3 = mtx.forward(player_points[3]);
 
-        // Draw lines to rasterizer with wrapping
+        // Draw lines to Buffer with wrapping
 
         let player_color: Color = {
             if self.player.active {
@@ -461,12 +461,12 @@ impl AsteroidsEngine {
             }
         };
 
-        //self.rasterizer.wrapping = true;
-        self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, player_color);
-        self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, player_color);
-        self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, player_color);
-        self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, player_color);
-        //self.rasterizer.wrapping = false;
+        //self.Buffer.wrapping = true;
+        self.screen.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, player_color);
+        self.screen.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, player_color);
+        self.screen.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, player_color);
+        self.screen.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, player_color);
+        //self.Buffer.wrapping = false;
     }
 
     ///// ====== PLAYER ====== /////
@@ -507,7 +507,7 @@ impl AsteroidsEngine {
         for i in 0..self.explosion_particles.len() {
             if self.explosion_particles[i].radius > 0.1 {
                 let mtx_position = self.camera.forward(self.explosion_particles[i].position);
-                self.rasterizer.pcircle(false, 
+                self.screen.pcircle(false, 
                     mtx_position.x as i32,
                     mtx_position.y as i32,
                     (self.explosion_particles[i].radius * self.camera_boomzoom) as i32, Color::hsv(0.1, 1.0, self.explosion_particles[i].radius / 8.0)
@@ -578,7 +578,7 @@ impl AsteroidsEngine {
         for bullet in &self.bullets {
             if bullet.active {
                 let mtx_position = self.camera.forward(bullet.position);
-                self.rasterizer.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::WHITE);
+                self.screen.pcircle(true, mtx_position.x as i32, mtx_position.y as i32, bullet.radius as i32, Color::WHITE);
             }   
         }
     }
@@ -697,17 +697,17 @@ impl AsteroidsEngine {
                 let mtx_line6 = mtx.forward(asteroid.shape[6]);
                 let mtx_line7 = mtx.forward(asteroid.shape[7]);
 
-                // Draw lines to rasterizer with wrapping
-                //self.rasterizer.wrapping = true;
-                self.rasterizer.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::WHITE);
-                self.rasterizer.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::WHITE);
-                //self.rasterizer.wrapping = false;
+                // Draw lines to Buffer with wrapping
+                //self.Buffer.wrapping = true;
+                self.screen.pline(mtx_line0.x as i32, mtx_line0.y as i32, mtx_line1.x as i32, mtx_line1.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line1.x as i32, mtx_line1.y as i32, mtx_line2.x as i32, mtx_line2.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line2.x as i32, mtx_line2.y as i32, mtx_line3.x as i32, mtx_line3.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line3.x as i32, mtx_line3.y as i32, mtx_line4.x as i32, mtx_line4.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line4.x as i32, mtx_line4.y as i32, mtx_line5.x as i32, mtx_line5.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line5.x as i32, mtx_line5.y as i32, mtx_line6.x as i32, mtx_line6.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line6.x as i32, mtx_line6.y as i32, mtx_line7.x as i32, mtx_line7.y as i32, Color::WHITE);
+                self.screen.pline(mtx_line7.x as i32, mtx_line7.y as i32, mtx_line0.x as i32, mtx_line0.y as i32, Color::WHITE);
+                //self.Buffer.wrapping = false;
             }
             
         }
@@ -732,39 +732,39 @@ impl AsteroidsEngine {
     }
 
     pub fn draw_score(&mut self) {
-        self.rasterizer.set_draw_mode(DrawMode::Alpha);
-        self.rasterizer.opacity = 200;
-        self.rasterizer.tint = Color::hsv(self.realtime * 10.0, 1.0, 1.0);
-        self.rasterizer.pprint(&self.font_score, format!("{:0>8}", self.score), self.player.position.x as i32 - 44, self.player.position.y as i32 + 24, 0, None);
-        self.rasterizer.tint = Color::WHITE;
-        self.rasterizer.opacity = 255;
-        self.rasterizer.set_draw_mode(DrawMode::Opaque);
+        self.screen.set_draw_mode(DrawMode::Alpha);
+        self.screen.opacity = 200;
+        self.screen.tint = Color::hsv(self.realtime * 10.0, 1.0, 1.0);
+        self.screen.pprint(&self.font_score, format!("{:0>8}", self.score), self.player.position.x as i32 - 44, self.player.position.y as i32 + 24, 0, None);
+        self.screen.tint = Color::WHITE;
+        self.screen.opacity = 255;
+        self.screen.set_draw_mode(DrawMode::Opaque);
     }
 
     pub fn draw_performance_text(&mut self) {
-        let total_pixels = self.rasterizer.drawn_pixels_since_clear;
-        self.rasterizer.pprint(&self.font_score, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nPIXELS: {}\nCONTROLS: {}\n", 
+        let total_pixels = self.screen.drawn_pixels_since_clear;
+        self.screen.pprint(&self.font_score, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nPIXELS: {}\nCONTROLS: {}\n", 
         (self.profiling_update_time * 100000.0).ceil() / 100.0, 
         (self.profiling_draw_time * 100000.0).ceil() / 100.0,
         total_pixels, self.controls), 8, 8, 7, None);
     }
 
     pub fn draw_debug_collision(&mut self) {
-        self.rasterizer.set_draw_mode(DrawMode::NoOp);
-        self.rasterizer.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::GREEN);
+        self.screen.set_draw_mode(DrawMode::NoOp);
+        self.screen.pcircle(false, self.player.position.x as i32, self.player.position.y as i32, self.player.radius as i32, Color::GREEN);
 
         for asteroid in &self.asteroids {
             if asteroid.active {
-                self.rasterizer.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::GREEN);
+                self.screen.pcircle(false, asteroid.position.x as i32, asteroid.position.y as i32, asteroid.radius as i32, Color::GREEN);
             }
         }
 
         for bullet in &self.bullets {
             if bullet.active {
-                self.rasterizer.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::GREEN);
+                self.screen.pcircle(false, bullet.position.x as i32, bullet.position.y as i32, bullet.radius as i32, Color::GREEN);
             }
         }
-        self.rasterizer.set_draw_mode(DrawMode::Opaque);
+        self.screen.set_draw_mode(DrawMode::Opaque);
     }
 
     pub fn update_times(&mut self) {

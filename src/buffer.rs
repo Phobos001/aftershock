@@ -1,17 +1,18 @@
 use rayon::prelude::*;
+use std::thread::scope;
 
 use crate::color::*;
 use crate::math;
-use crate::partitioned_rasterizer::PartitionedRasterizer;
+use crate::partitioned_buffer::PartitionedBuffer;
 use crate::vector2::*;
 use crate::matrix3::*;
 use crate::font::*;
 use crate::math::*;
 
 // Draw Mode Definition
-pub type PSetOp = fn(&mut Rasterizer, usize, Color);
+pub type PSetOp = fn(&mut Buffer, usize, Color);
 
-/// Controls how a Rasterizer should draw incoming pixels.
+/// Controls how a Buffer should draw incoming pixels.
 #[derive(Debug, Clone, Copy)]
 pub enum DrawMode {
     NoOp,
@@ -30,191 +31,191 @@ pub enum DrawMode {
     // Collect,
 }
 
-fn pset_noop(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
-    rasterizer.color[idx + 0] = color.r;  // R
-    rasterizer.color[idx + 1] = color.g;  // G
-    rasterizer.color[idx + 2] = color.b;  // B
-    rasterizer.color[idx + 3] = color.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+fn pset_noop(buffer: &mut Buffer, idx: usize, color: Color) {
+    buffer.color[idx + 0] = color.r;  // R
+    buffer.color[idx + 1] = color.g;  // G
+    buffer.color[idx + 2] = color.b;  // B
+    buffer.color[idx + 3] = color.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
-fn pset_noalpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
-    let color = color * rasterizer.tint;
-    rasterizer.color[idx + 0] = color.r;  // R
-    rasterizer.color[idx + 1] = color.g;  // G
-    rasterizer.color[idx + 2] = color.b;  // B
-    rasterizer.color[idx + 3] = color.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+fn pset_noalpha(buffer: &mut Buffer, idx: usize, color: Color) {
+    let color = color * buffer.tint;
+    buffer.color[idx + 0] = color.r;  // R
+    buffer.color[idx + 1] = color.g;  // G
+    buffer.color[idx + 2] = color.b;  // B
+    buffer.color[idx + 3] = color.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels if they are fully opaque, otherwise ignore them.
-fn pset_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a < 255 { return; }
-    let color = color * rasterizer.tint;
-    rasterizer.color[idx + 0] = color.r;  // R
-    rasterizer.color[idx + 1] = color.g;  // G
-    rasterizer.color[idx + 2] = color.b;  // B
-    rasterizer.color[idx + 3] = color.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    let color = color * buffer.tint;
+    buffer.color[idx + 0] = color.r;  // R
+    buffer.color[idx + 1] = color.g;  // G
+    buffer.color[idx + 2] = color.b;  // B
+    buffer.color[idx + 3] = color.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels if they are fully opaque, otherwise ignore them. Forces them to be the tint color.
 /// Useful for flashes or making masks
-fn pset_force_tint(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_force_tint(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a < 255 { return; }
-    rasterizer.color[idx + 0] = rasterizer.tint.r;  // R
-    rasterizer.color[idx + 1] = rasterizer.tint.g;  // G
-    rasterizer.color[idx + 2] = rasterizer.tint.b;  // B
-    rasterizer.color[idx + 3] = rasterizer.tint.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = buffer.tint.r;  // R
+    buffer.color[idx + 1] = buffer.tint.g;  // G
+    buffer.color[idx + 2] = buffer.tint.b;  // B
+    buffer.color[idx + 3] = buffer.tint.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw pixels and blend them with the background based on the alpha channel
-fn pset_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
     
-    let fg = color * rasterizer.tint;
+    let fg = color * buffer.tint;
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = Color::blend_fast(fg, bg, rasterizer.opacity);
+    let c = Color::blend_fast(fg, bg, buffer.opacity);
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Add incoming and buffer pixels together and draw to screen
-fn pset_addition(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_addition(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
-    let fg = color * rasterizer.tint;
+    let fg = color * buffer.tint;
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = Color::blend_fast(fg, bg, rasterizer.opacity) + bg;
+    let c = Color::blend_fast(fg, bg, buffer.opacity) + bg;
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Multiply incoming pixel with buffer pixel.
-fn pset_multiply(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_multiply(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
-    let fg = color * rasterizer.tint;
+    let fg = color * buffer.tint;
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity) * bg;
+    let c = Color::blend_fast(fg.inverted(), bg, buffer.opacity) * bg;
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel with alpha blending
-fn pset_inverted_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_inverted_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a <= 0 { return; }
-    let fg = color* rasterizer.tint;
+    let fg = color* buffer.tint;
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = Color::blend_fast(fg.inverted(), bg, rasterizer.opacity);
+    let c = Color::blend_fast(fg.inverted(), bg, buffer.opacity);
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_inverted_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a < 255 { return; }
 
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = (bg * rasterizer.tint).inverted();
+    let c = (bg * buffer.tint).inverted();
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_bg_opaque(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_inverted_bg_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a < 255 { return; }
 
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = (bg * rasterizer.tint).inverted();
+    let c = (bg * buffer.tint).inverted();
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_bg_alpha(rasterizer: &mut Rasterizer, idx: usize, color: Color) {
+fn pset_inverted_bg_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
     if color.a < 255 { return; }
 
     let bg = Color::new(
-        rasterizer.color[idx + 0],
-        rasterizer.color[idx + 1],
-        rasterizer.color[idx + 2],
+        buffer.color[idx + 0],
+        buffer.color[idx + 1],
+        buffer.color[idx + 2],
         255,
     );
 
-    let c = Color::blend_fast(bg, (bg * rasterizer.tint).inverted(), rasterizer.opacity);
+    let c = Color::blend_fast(bg, (bg * buffer.tint).inverted(), buffer.opacity);
 
-    rasterizer.color[idx + 0] = c.r;  // R
-    rasterizer.color[idx + 1] = c.g;  // G
-    rasterizer.color[idx + 2] = c.b;  // B
-    rasterizer.color[idx + 3] = c.a;  // A
-    rasterizer.drawn_pixels_since_clear += 1;
+    buffer.color[idx + 0] = c.r;  // R
+    buffer.color[idx + 1] = c.g;  // G
+    buffer.color[idx + 2] = c.b;  // B
+    buffer.color[idx + 3] = c.a;  // A
+    buffer.drawn_pixels_since_clear += 1;
 }
 
 /// Drawing switchboard that draws directly into a  Drawing options like Tint and Opacity must be manually changed by the user.
 #[derive(Clone)]
-pub struct Rasterizer {
+pub struct Buffer {
     pset_op: PSetOp,
 
-    // For Partitioned Rasterizer
+    // For Partitioned Buffer
     pub offset_x: usize,
     pub offset_y: usize,
     
@@ -231,19 +232,19 @@ pub struct Rasterizer {
     pub tint: Color,
     pub opacity: u8,
 
-    pub drawn_pixels_since_clear: u64,
+    pub drawn_pixels_since_clear: u32,
 }
 
-impl Rasterizer {
+impl Buffer {
 
-    /// Makes a new Rasterizer to draw to a screen-sized buffer
+    /// Makes a new Buffer to draw to a screen-sized buffer
     ///
     /// # Arguments
     /// * 'width' - Horizontal size of the 
     /// * 'height' - Vertical size of the 
-    pub fn new(width: usize, height: usize) -> Rasterizer {
-        //println!("Rasterizer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
-        Rasterizer {
+    pub fn new(width: usize, height: usize) -> Buffer {
+        //println!("Buffer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
+        Buffer {
             pset_op: pset_opaque,
 
             offset_x: 0,
@@ -266,7 +267,7 @@ impl Rasterizer {
         }
     }
 
-    pub fn new_from_image(path_to: &str) -> Result<Rasterizer, String> {
+    pub fn new_from_image(path_to: &str) -> Result<Buffer, String> {
 		match lodepng::decode32_file(path_to) {
 			Ok(image) => {
 				//println!("Image: {}, Res: {} x {}, Size: {}B", path_to, image.width, image.height, image.buffer.len());
@@ -275,7 +276,7 @@ impl Rasterizer {
 
                 // Convert to atomics for parallelism
 
-				Ok(Rasterizer {
+				Ok(Buffer {
                     pset_op: pset_opaque,
 
                     width: image.width,
@@ -311,9 +312,9 @@ impl Rasterizer {
         self.color = vec![0; width * height * 4];
     }
 
-    /// Sets the Rasterizers drawing mode for incoming pixels. Should be defined before every drawing operation.
+    /// Sets the Buffers drawing mode for incoming pixels. Should be defined before every drawing operation.
     /// # Arguments
-    /// * 'mode' - Which drawing function should the Rasterizer use.
+    /// * 'mode' - Which drawing function should the Buffer use.
     pub fn set_draw_mode(&mut self, mode: DrawMode) {
         match mode {
             DrawMode::NoOp                  => {self.pset_op = pset_noop;}
@@ -331,17 +332,17 @@ impl Rasterizer {
         }
     }
 
-    pub fn into_partitioned(&self) -> PartitionedRasterizer {
-        let mut pr = PartitionedRasterizer::new(self.width, self.height, 0);
-        pr.rasterizer.blit(self, 0, 0);
+    pub fn into_partitioned(&self) -> PartitionedBuffer {
+        let mut pr = PartitionedBuffer::new(self.width, self.height, 0);
+        pr.buffer.blit(self, 0, 0);
         pr
     }
 
     /// Create a copy of a region 
-    /*pub fn blit_copy(&self, x: i32, y: i32, width: usize, height: usize) -> Rasterizer {
+    /*pub fn blit_copy(&self, x: i32, y: i32, width: usize, height: usize) -> Buffer {
         let stride = 4;
 
-        let mut rasterizer: Rasterizer = Rasterizer::new(width, height);
+        let mut Buffer: Buffer = Buffer::new(width, height);
 
         // Go down in rows. i is the current row.
         self.color.chunks_exact(self.width * 4).enumerate().for_each(|(row_idx, pixel)| {
@@ -351,7 +352,7 @@ impl Rasterizer {
         });
     }*/
 
-    pub fn blit(&mut self, src: &Rasterizer, x: i32, y: i32) {
+    pub fn blit(&mut self, src: &Buffer, x: i32, y: i32) {
         let is_equal_size: bool = self.width == src.width && self.height == src.height;
         if is_equal_size {
             self.color.copy_from_slice(&src.color);
@@ -469,7 +470,7 @@ impl Rasterizer {
         self.camera_matrix = camera_mtx_p * camera_mtx_r * camera_mtx_s * camera_mtx_o;
     }
 
-    /// Draws a pixel to the color buffer, using the Rasterizers set DrawMode. DrawMode defaults to Opaque.
+    /// Draws a pixel to the color buffer, using the Buffers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
         self.drawn_pixels_since_clear += 1;
         //let x = x.rem_euclid(self.width as i32);
@@ -551,20 +552,27 @@ impl Rasterizer {
         }
     }
     
-        /// Draws a rectangle onto the screen. Can either be filled or outlined.
+    /// Draws a rectangle onto the screen. Can either be filled or outlined.
     pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
-        let x0 = i32::clamp(x, 0, self.width as i32);
-        let x1 = i32::clamp(x + w, 0, self.width as i32);
-        let y0 = i32::clamp(y, 0, self.height as i32);
-        let y1 = i32::clamp(y + h, 0, self.height as i32);
+
     
         if filled {
+            let x0 = i32::clamp(x, 0, self.width as i32);
+            let x1 = i32::clamp(x + w, 0, self.width as i32);
+            let y0 = i32::clamp(y, 0, self.height as i32);
+            let y1 = i32::clamp(y + h, 0, self.height as i32);
+
             for py in y0..y1 {
                 for px in x0..x1 {
                     self.pset(px, py, color);
                 }
             }
         } else {
+            let x0 = x;
+            let x1 = x + w;
+            let y0 = y;
+            let y1 = y + h;
+
             for tops in x0..x1+1 {
                 self.pset(tops, y0, color);
                 self.pset(tops, y1, color);
@@ -663,7 +671,7 @@ impl Rasterizer {
     }
 
     /// Draws an image directly to the screen.
-    pub fn pimg(&mut self, image: &Rasterizer, x: i32, y: i32) {
+    pub fn pimg(&mut self, image: &Buffer, x: i32, y: i32) {
         for ly in 0..image.height as i32 {
             for lx in 0..image.width as i32 {
                 let pc = image.pget(lx, ly);
@@ -679,7 +687,7 @@ impl Rasterizer {
     }
 
     /// Draws a section of an image directly to the screen.
-    pub fn pimgrect(&mut self, image: &Rasterizer, x: i32, y: i32, rx: i32, ry: i32, rw: i32, rh: i32) {
+    pub fn pimgrect(&mut self, image: &Buffer, x: i32, y: i32, rx: i32, ry: i32, rw: i32, rh: i32) {
         let range_x = i32::clamp(rx + rw, 0, self.width as i32);
         let range_y = i32::clamp(ry + rh, 0, self.height as i32);
         for ly in ry..range_y {
@@ -696,7 +704,7 @@ impl Rasterizer {
     }
 
     /// Draws a rotated and scaled image to the screen using matrix multiplication.
-    pub fn pimgmtx(&mut self, image: &Rasterizer, position_x: f32, position_y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
+    pub fn pimgmtx(&mut self, image: &Buffer, position_x: f32, position_y: f32, rotation: f32, scale_x: f32, scale_y: f32, offset_x: f32, offset_y: f32) {
 
         // Early out if the image is going to be too small to draw
         let area_x = image.width as f32 * scale_x;
@@ -789,7 +797,7 @@ impl Rasterizer {
         x0: i32, y0: i32, 
         x1: i32, y1: i32, 
         x2: i32, y2: i32,
-        image: &Rasterizer) {
+        image: &Buffer) {
 
         let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.width as i32);
         let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.width as i32);
@@ -880,8 +888,57 @@ impl Rasterizer {
         }
     }
 
+    pub fn pcomposite_opaque(&mut self, buffer: &Buffer) {
+        if self.color.len() != buffer.color.len() { return; }
+
+        self.color.par_chunks_exact_mut(4).zip(buffer.color.par_chunks_exact(4)).for_each(|(c1, c2)| {
+            let dst = Color::new(c2[0], c2[1], c2[2], c2[3]);
+
+            if c2[3] >= 255 { 
+                c1[0] = dst.r;
+                c1[1] = dst.g;
+                c1[2] = dst.b;
+                c1[3] = 255;
+            }
+
+            
+        });
+    }
+
+    pub fn pcomposite_alpha(&mut self, buffer: &Buffer, opacity: u8) {
+        if self.color.len() != buffer.color.len() { return; }
+
+        self.color.par_chunks_exact_mut(4).zip(buffer.color.par_chunks_exact(4)).for_each(|(c1, c2)| {
+            let src = Color::new(c2[0], c2[1], c2[2], c2[3]);
+            let dst = Color::new(c1[0], c1[1], c1[2], c1[3]);
+
+            let fc = Color::blend_fast(dst, src, 255 - opacity);
+
+            c1[0] = fc.r;
+            c1[1] = fc.g;
+            c1[2] = fc.b;
+            c1[3] = fc.a;
+        });
+    }
+
+    pub fn pcomposite_multiply(&mut self, buffer: &Buffer) {
+        if self.color.len() != buffer.color.len() { return; }
+
+        self.color.par_chunks_exact_mut(4).zip(buffer.color.par_chunks_exact(4)).for_each(|(c1, c2)| {
+            let src = Color::new(c2[0], c2[1], c2[2], c2[3]);
+            let dst = Color::new(c1[0], c1[1], c1[2], c1[3]);
+
+            let fc = Color::blend_fast(dst, src, 255) * src;
+
+            c1[0] = fc.r;
+            c1[1] = fc.g;
+            c1[2] = fc.b;
+            c1[3] = fc.a;
+        });
+    }
+
     /// Count pixels in line operation, without drawing anything to the raster.
-    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> u32{
+    pub fn cline(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) -> u32 {
 
         let mut pixel_count: u32 = 0;
 

@@ -2,12 +2,12 @@
 
 
 use crate::color::*;
-use crate::rasterizer::Rasterizer;
+use crate::buffer::Buffer;
 
 use std::io::prelude::*;
 use std::fs::File;
 
-/// Bitmap font for drawing simple text. To be used with the Rasterizers pprint function.
+/// Bitmap font for drawing simple text. To be used with the Buffers pprint function.
 /// All bitmap fonts need a glyph index that's in order of left-to-right, top-to-bottom of the glyphs used
 /// in the font image. The glyph index is used as a lookup table to find the corrisponding glyph subimage.
 ///
@@ -20,7 +20,7 @@ use std::fs::File;
 pub struct Font {
 	pub glyphidx: Vec<char>,
 	pub glyphidx_sizes: Vec<FontGlyph>,
-	pub fontimg: Rasterizer,
+	pub fontimg: Buffer,
 	pub glyph_width: usize,
 	pub glyph_height: usize,
 	pub glyph_spacing: i32,
@@ -36,7 +36,7 @@ impl Font {
 		let glyphidx_sizes: Vec<FontGlyph> = Vec::new();
 
 		
-		let fontimg_result = Rasterizer::new_from_image(path_image);
+		let fontimg_result = Buffer::new_from_image(path_image);
 		if fontimg_result.is_ok() {
 
 	
@@ -57,7 +57,7 @@ impl Font {
 	}
 
 	pub fn default() -> Font {
-		Font { glyphidx: Vec::new(), glyphidx_sizes: Vec::new(), fontimg: Rasterizer::new(0, 0), glyph_width: 0, glyph_height: 0, glyph_spacing: 0 }
+		Font { glyphidx: Vec::new(), glyphidx_sizes: Vec::new(), fontimg: Buffer::new(0, 0), glyph_width: 0, glyph_height: 0, glyph_spacing: 0 }
 	}
 
 	pub fn new_ttf(path_ttf: &str, glyphidxstr: &str, glyph_spacing: i32, point_size: f32, alpha_threshold: f32) -> Font {
@@ -95,7 +95,7 @@ impl Font {
             (max_x - min_x) as u32
         };
 
-		let mut fontimg: Rasterizer = Rasterizer::new(glyphs_width as usize, glyphs_height as usize);
+		let mut fontimg: Buffer = Buffer::new(glyphs_width as usize, glyphs_height as usize);
 
 		let mut glyphidx_sizes: Vec<FontGlyph> = Vec::with_capacity(glyphidx.len());
 

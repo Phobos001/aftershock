@@ -12,6 +12,7 @@ impl Color {
 
 	pub const CLEAR:	Color = Color { r:   0, g:   0, b:   0, a: 255 };
 	pub const WHITE: 	Color = Color { r: 255, g: 255, b: 255, a: 255 };
+	pub const BLACK: 	Color = Color { r:   0, g:   0, b:   0, a: 255 };
 	pub const RED:	 	Color = Color { r: 255, g: 	 0, b:   0, a: 255 };
 	pub const GREEN: 	Color = Color { r:   0, g: 255, b:   0, a: 255 };
 	pub const BLUE: 	Color = Color { r:   0, g:   0, b: 255, a: 255 };
@@ -56,7 +57,7 @@ impl Color {
 	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
-		let alpha: u32 = (src.a - (255 - opacity)) as u32;
+		let alpha: u32 = u32::wrapping_sub(src.a as u32, (255 - opacity) as u32);
 
 		let sr: u32 = src.r as u32;
 		let sg: u32 = src.g as u32;
@@ -66,9 +67,9 @@ impl Color {
 		let dg: u32 = dst.g as u32;
 		let db: u32 = dst.b as u32;
 
-		let r = ((sr * alpha) + (dr * (255 - alpha))) >> 8;
-		let g = ((sg * alpha) + (dg * (255 - alpha))) >> 8;
-		let b = ((sb * alpha) + (db * (255 - alpha))) >> 8;
+		let r = ((sr * alpha) + (dr * (u32::wrapping_sub(255, alpha)))) >> 8;
+		let g = ((sg * alpha) + (dg * (u32::wrapping_sub(255, alpha)))) >> 8;
+		let b = ((sb * alpha) + (db * (u32::wrapping_sub(255, alpha)))) >> 8;
 
 		Color { r: r as u8, g: g as u8, b: b as u8, a: 255}
 
@@ -84,7 +85,7 @@ impl Color {
 		}
 	}
 
-	/// Hue, Saturation, and Value color definition. Should not be used per pixel due to casting and division use.
+	/// Hue, Saturation, and Value color definition. Should not be used per pixel for performance reasons.
 	pub fn hsv(hue: f32, saturation: f32, value: f32) -> Color {
 		let hi: i32 = ((hue / 60.0).floor() as i32) % 6;
 		let f: f32 = (hue / 60.0) - (hue / 60.0).floor();
@@ -123,10 +124,10 @@ impl std::ops::Add for Color {
 
 	fn add(self, rhs: Self) -> Self {
 		Color::new(
-			self.r + rhs.r,
-			self.g + rhs.g,
-			self.b + rhs.b,
-			self.a + rhs.a,
+			u8::saturating_add(self.r, rhs.r),
+			u8::saturating_add(self.g, rhs.g),
+			u8::saturating_add(self.b, rhs.b),
+			u8::saturating_add(self.a, rhs.a)
 		)
 	}
 }
