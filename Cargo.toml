@@ -24,11 +24,10 @@ rayon = "1.6.1"
 
 [dev-dependencies]
 sdl2 = {version = "0.35.2", features = ["static-link", "use-pkgconfig"] }
-minifb = "0.23.0"
 device_query = "1.1.2"
 alea = "0.2.2"
 soloud = "1.0.2"
-dashmap = {version = "5.4.0", features = {"inline", "serde", "rayon"}}
+dashmap = {version = "5.4.0", features = ["serde", "rayon"]}
 
 [profile.dev]
 opt-level = 3

@@ -1,4 +1,3 @@
-extern crate minifb;
 extern crate sdl2;
 
 mod aabb;
@@ -17,41 +16,33 @@ pub enum Sdl2VideoMode {
 pub fn main() {
     let mut engine = PlatformerEngine::new();
 
-    let mut use_minifb: bool = false;
 
     let args: Vec<_> = std::env::args().collect();
     for arg in args {
         match arg.as_str() {
             "--fullscreen" => { engine.fullscreen = true; },
+            "--exclusive" => { engine.fullscreen = true; },
             "--windowed" => { engine.fullscreen = false; },
             "--hardware-canvas" => { engine.hardware_canvas = true; },
             "--no-integer-scale" => { engine.integer_scaling = false; },
             "--stretch-fill" => { engine.stretch_fill = true; },
-            "--minifb" => {  use_minifb = true; },
             _ => {}
         }
     }
 
     // If window properties change we can restart SDL2 without ending the game.
     while !engine.is_quitting {
-        if use_minifb {
-            println!("Starting minifb...");
-            start_minifb(&mut engine);
-        } else {
-            println!("Starting sdl2...");
-            start_sdl2(&mut engine);
-        }
+        start_sdl2(&mut engine);
     }
 }
 
 pub fn start_sdl2(engine: &mut PlatformerEngine) {
     use sdl2::event::Event;
     use sdl2::pixels::{PixelFormatEnum};
-    
-    let mut video_mode: Sdl2VideoMode = Sdl2VideoMode::Windowed;
 
     // Init SDL and surface texture
     let sdl_context = sdl2::init().unwrap();
+
     let video_subsystem = sdl_context.video().unwrap();
 
     let title = PlatformerEngine::TITLE;
@@ -60,7 +51,7 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
             true => {
                 video_subsystem
                 .window(title, PlatformerEngine::RENDER_WIDTH as u32, PlatformerEngine::RENDER_WIDTH as u32)
-                .fullscreen()
+                .fullscreen_desktop()
                 .position_centered()
                 .build()
                 .unwrap()
@@ -103,6 +94,15 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    let mut update_timer: f64 = 0.0;
+    let mut draw_timer: f64 = 0.0;
+
+    let mut delta_now: f64 = aftershock::timestamp();
+    let mut delta_last: f64 = 0.0;
+
+    let update_rate: f64 = 1.0 / 300.0;
+    let draw_rate: f64 = 1.0 / if engine.hardware_canvas { 300.0 } else { 120.0 };
+
     'running: loop {
 
         for event in event_pump.poll_iter() {
@@ -115,12 +115,28 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
             }
         }
 
-        engine.update_times();
+        // Calculate delta times for update
+        delta_last = delta_now;
+        delta_now = aftershock::timestamp();
 
-        engine.update();
+
+        let dt: f64 = delta_now - delta_last;
+
+        engine.dt = f64::max(dt, 1.0 / 300.0) as f32;
+        engine.dt_unscaled = dt as f32;
+        engine.realtime += dt as f32;
+
+        update_timer -= dt;
+        draw_timer -= dt;
+
+        if update_timer <= 0.0 {
+            engine.update();
+            update_timer = update_rate;
+        }
+        
         
 
-        if engine.present_time <= 0.0 {
+        if draw_timer <= 0.0 {
             canvas.clear();
             engine.draw();
 
@@ -128,57 +144,10 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
             let _ = canvas.copy(&screentex, None, None);
             canvas.present();
 
-            engine.present_time = 1.0 / if engine.hardware_canvas { 240.0 } else { 60.0 };
+            draw_timer = draw_rate;
         }
     }
     
 
     let _error_code = engine.update();
-}
-
-pub fn start_minifb(engine: &mut PlatformerEngine) -> u8 {
-    use minifb::*;
-    
-    // Init MINIFB stuff
-    let mut window = match Window::new(
-        "Asteroids!",
-        PlatformerEngine::RENDER_WIDTH,
-        PlatformerEngine::RENDER_HEIGHT,
-        WindowOptions {
-            resize: true,
-            scale: Scale::FitScreen,
-            scale_mode: ScaleMode::AspectRatioStretch,
-            ..WindowOptions::default()
-        },
-    ) {
-        Ok(win) => win,
-        Err(err) => {
-            println!("Unable to create window {}", err);
-            return 1;
-        }
-    };
-
-    while window.is_open() {
-        engine.update_times();
-        engine.update();
-
-        if engine.present_time <= 0.0 {
-            engine.draw();
-
-            let colors_u32: Vec<u32> = engine.screen.color.chunks_exact(4)
-            .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
-            .collect();
-    
-            // Present
-            window
-            .update_with_buffer(colors_u32.as_slice(), PlatformerEngine::RENDER_WIDTH, PlatformerEngine::RENDER_HEIGHT)
-            .unwrap();
-
-            engine.present_time = 1.0 / 60.0;
-        }
-    }
-
-    engine.is_quitting = true;
-
-    return 0;
 }

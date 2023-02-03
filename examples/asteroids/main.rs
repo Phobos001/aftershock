@@ -1,4 +1,3 @@
-extern crate minifb;
 extern crate sdl2;
 
 mod asteroids;
@@ -14,59 +13,8 @@ pub enum Sdl2VideoMode {
 pub fn main() {
     let mut engine = AsteroidsEngine::new();
 
-    let args: Vec<_> = std::env::args().collect();
-    for arg in args {
-        match arg.as_str() {
-            "--sdl2" => { println!("Starting SDL2..."); start_sdl2(&mut engine); },
-            "--minifb" => { println!("Starting minifb..."); start_minifb(&mut engine); },
-            _ => { println!("Use flags \"--minifb\" or \"--sdl2\" to pick a frontend to use.")}
-        }
-    }
+    start_sdl2(&mut engine);
 
-}
-
-pub fn start_minifb(engine: &mut AsteroidsEngine) -> u8 {
-    use minifb::*;
-    
-    // Init MINIFB stuff
-    let mut window = match Window::new(
-        "Asteroids!",
-        AsteroidsEngine::RENDER_WIDTH,
-        AsteroidsEngine::RENDER_HEIGHT,
-        WindowOptions {
-            resize: true,
-            scale: Scale::X1,
-            scale_mode: ScaleMode::AspectRatioStretch,
-            ..WindowOptions::default()
-        },
-    ) {
-        Ok(win) => win,
-        Err(err) => {
-            println!("Unable to create window {}", err);
-            return 1;
-        }
-    };
-
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        engine.update();
-
-        if engine.present_time <= 0.0 {
-            engine.draw();
-
-            let colors_u32: Vec<u32> = engine.screen.color.chunks_exact(4)
-            .map(|c| (c[0] as u32) << 16 | (c[1] as u32) << 8 | (c[2] as u32) << 0)
-            .collect();
-    
-            // Present
-            window
-            .update_with_buffer(colors_u32.as_slice(), AsteroidsEngine::RENDER_WIDTH, AsteroidsEngine::RENDER_HEIGHT)
-            .unwrap();
-
-            engine.present_time = 1.0 / 120.0;
-        }
-    }
-
-    return 0;
 }
 
 pub fn start_sdl2(engine: &mut AsteroidsEngine) {

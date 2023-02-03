@@ -2,18 +2,9 @@
 
 use aftershock::*;
 use aftershock::buffer::*;
-use aftershock::vector2::*;
-use aftershock::color::*;
 use aftershock::font::*;
-use aftershock::matrix3::*;
-use aftershock::math::*;
-
-
-
-use std::time::Instant;
 
 use crate::gamestate::*;
-use crate::aabb::*;
 use crate::controls::*;
 
 
@@ -37,15 +28,13 @@ pub struct PlatformerEngine {
     pub realtime: f32,
     pub timescale: f32,
 
-    pub profiling_update_time: f64,
-    pub profiling_draw_time: f64,
-
     pub dt: f32,
     pub dt_unscaled: f32,
-    dt_before: Instant,
+
+    pub profiling_update_time: f64,
+    pub profiling_draw_time: f64,
     
     pub present_time: f32,
-    pub update_time: f32,
 
     pub is_quitting: bool,
 
@@ -88,7 +77,6 @@ impl PlatformerEngine {
             
             dt: 0.0,
             dt_unscaled: 0.0,
-            dt_before: Instant::now(),
             realtime: 0.0,
             timescale: 1.0,
 
@@ -98,7 +86,6 @@ impl PlatformerEngine {
             profiling_draw_time: 0.0,
 
             present_time: 0.0,
-            update_time: 0.0,
 
             is_quitting: false,
 		}
@@ -131,35 +118,11 @@ impl PlatformerEngine {
         let draw_time_after: f64 = timestamp();
         self.profiling_draw_time = draw_time_after - draw_time_before;
 
-        self.screen.pprint(&self.main_font, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nTICS: {}", 
+        self.screen.pprint(&self.main_font, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nTICS: {}\nRT: {}s", 
         (self.profiling_update_time * 100000.0).round() / 100.0, 
         (self.profiling_draw_time * 100000.0).round() / 100.0,
-        self.tics),
+        self.tics, self.realtime),
         4, 4, 10, None)
-    }
-
-
-    
-
-    pub fn update_times(&mut self) {
-        let now = Instant::now();
-
-        let now_s = (now.elapsed().as_secs() as f32) + (now.elapsed().subsec_nanos() as f32 * 1.0e-9);
-        let before_s = (self.dt_before.elapsed().as_secs() as f32) + (self.dt_before.elapsed().subsec_nanos() as f32 * 1.0e-9);
-
-        self.dt_unscaled = before_s - now_s;
-        
-        if self.dt_unscaled < 0.0 {
-            self.dt_unscaled = 0.0;
-        }
-
-        self.dt = self.dt_unscaled * self.timescale;
-        self.realtime += self.dt_unscaled;
-        self.present_time -= self.dt_unscaled;
-
-        self.dt_before = now;
-
-        self.update_time -= self.dt_unscaled;
     }
 
 }
