@@ -49,12 +49,14 @@ pub fn main() {
         light_sprite.set_draw_mode(DrawMode::Alpha);
         
         for step in 0..128 {
-            light_sprite.opacity = 2;
+            light_sprite.opacity = 3;
             light_sprite.pcircle(true, 128, 128, step as i32, Color::WHITE)
         }
 
         light_sprite.set_draw_mode(DrawMode::Opaque);
     }
+
+    let bake_time_before: f64 = timestamp();
 
     // Screen buffer
     let mut buffer0: Buffer = Buffer::new(RENDER_WIDTH as usize, RENDER_HEIGHT as usize);
@@ -71,7 +73,105 @@ pub fn main() {
     // Lights
     let mut buffer4: Buffer = Buffer::new(RENDER_WIDTH as usize, RENDER_HEIGHT as usize);
 
+    
+
     let mut opacity: u8 = 0;
+
+    // Prebake buffers using multiple threads
+    // Focus on composition performance
+    scope(|s| {
+        // Draw a checkerboard on thread 1
+
+        let buffer1_ref: &mut Buffer = &mut buffer1;
+        let _ = s.spawn(move || {
+            
+            for iy in 0..16 {
+                for ix in 0..16 {
+                    let color: Color = if iy % 2 == 0 { 
+                        if ix % 2 == 1 { 
+                            Color::WHITE
+                        } else {
+                            Color::BLACK
+                        }
+                    } else { 
+                        if ix % 2 == 0 { 
+                            Color::WHITE
+                        } else {
+                            Color::BLACK
+                        }
+                    };
+                    
+
+                    buffer1_ref.prectangle(true, ix * 32, iy * 32, 32, 32, color);
+                }
+            }
+            
+        });
+
+        // Draw smaller checkerboard on thread 2
+            let buffer2_ref: &mut Buffer = &mut buffer2;
+        let _ = s.spawn(move || {
+            for iy in 0..32 {
+                for ix in 0..32 {
+                    let color: Color = if iy % 2 == 0 { 
+                        if ix % 2 == 1 { 
+                            Color::RED
+                        } else {
+                            Color::BLUE
+                        }
+                    } else { 
+                        if ix % 2 == 0 { 
+                            Color::RED
+                        } else {
+                            Color::BLUE
+                        }
+                    };
+                    
+
+                    buffer2_ref.prectangle(true, ix * 16, iy * 16, 16, 16, color);
+                }
+            }
+            
+        });
+
+        // Draw opaque circles everywhere on thread 3
+        let buffer3_ref: &mut Buffer = &mut buffer3;
+        let _ = s.spawn(move || {
+            for _ in 0..64 {
+                buffer3_ref.pcircle(true, 
+                    (alea::f32() * RENDER_WIDTH as f32) as i32, 
+                    (alea::f32() * RENDER_HEIGHT as f32) as i32,
+                        alea::i32_in_range(0, 16),
+                    Color::hsv(alea::f32() * 360.0, 1.0, 1.0))
+            }
+            
+        });
+
+        // Pre-bake lights on buffer4
+        let buffer4_ref: &mut Buffer = &mut buffer4;
+        let _ = s.spawn(move || {
+            
+            buffer4_ref.set_draw_mode(DrawMode::Addition);
+
+            buffer4_ref.opacity = 255;
+            buffer4_ref.pimgmtx(&light_sprite, 256.0, 256.0, 0.0, 1.5, 1.5, 0.5, 0.5);
+            buffer4_ref.opacity = 255;
+
+            buffer4_ref.tint = Color::RED;
+            buffer4_ref.pimgmtx(&light_sprite, 128.0, 128.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+            buffer4_ref.tint = Color::GREEN;
+            buffer4_ref.pimgmtx(&light_sprite, 384.0, 128.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+            buffer4_ref.tint = Color::BLUE;
+            buffer4_ref.pimgmtx(&light_sprite, 384.0, 384.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+
+            buffer4_ref.set_draw_mode(DrawMode::Opaque);
+
+        });
+    });
+
+    let bake_time_after: f64 = timestamp();
+
+    println!("Buffer Bake Time: {} seconds!", bake_time_after - bake_time_before);
 
     'running: loop {
 
@@ -87,92 +187,6 @@ pub fn main() {
         let time_before = timestamp();
 
         buffer0.clear();
-        buffer1.clear();
-        buffer2.clear();
-        buffer3.clear();
-        buffer4.clear();
-        
-        scope(|s| {
-            // Draw a checkerboard on thread 1
-
-            let buffer1_ref: &mut Buffer = &mut buffer1;
-            let _ = s.spawn(move || {
-                
-                for iy in 0..16 {
-                    for ix in 0..16 {
-                        let color: Color = if iy % 2 == 0 { 
-                            if ix % 2 == 1 { 
-                                Color::WHITE
-                            } else {
-                                Color::BLACK
-                            }
-                        } else { 
-                            if ix % 2 == 0 { 
-                                Color::WHITE
-                            } else {
-                                Color::BLACK
-                            }
-                        };
-                        
-
-                        buffer1_ref.prectangle(true, ix * 32, iy * 32, 32, 32, color);
-                    }
-                }
-                
-            });
-
-            // Draw smaller checkerboard on thread 2
-            let buffer2_ref: &mut Buffer = &mut buffer2;
-            let _ = s.spawn(move || {
-                for iy in 0..32 {
-                    for ix in 0..32 {
-                        let color: Color = if iy % 2 == 0 { 
-                            if ix % 2 == 1 { 
-                                Color::RED
-                            } else {
-                                Color::BLUE
-                            }
-                        } else { 
-                            if ix % 2 == 0 { 
-                                Color::RED
-                            } else {
-                                Color::BLUE
-                            }
-                        };
-                        
-
-                        buffer2_ref.prectangle(true, ix * 16, iy * 16, 16, 16, color);
-                    }
-                }
-                
-            });
-
-            // Draw opaque circles everywhere on thread 3
-            let buffer3_ref: &mut Buffer = &mut buffer3;
-            let _ = s.spawn(move || {
-                for _ in 0..16 {
-                    buffer3_ref.pcircle(true, 
-                        (alea::f32() * RENDER_WIDTH as f32) as i32, 
-                        (alea::f32() * RENDER_HEIGHT as f32) as i32,
-                         alea::i32_in_range(0, 16),
-                        Color::hsv(alea::f32() * 360.0, 1.0, 1.0))
-                }
-                
-            });
-
-            // Draw light sprites on thread 4
-            let buffer4_ref: &mut Buffer = &mut buffer4;
-            let light_sprite_ref: &Buffer = &light_sprite;
-            let _ = s.spawn(move || {
-                //buffer4_ref.set_draw_mode(DrawMode::Addition);
-                buffer4_ref.pimgmtx(&light_sprite_ref, 256.0, 256.0, 0.0, 2.0, 2.0, 0.5, 0.5);
-                buffer4_ref.set_draw_mode(DrawMode::Opaque);
-                
-            });
-            
-        });
-
-
         
         // Copy buffer1 (Background) to the screen
         buffer0.blit(&buffer1, 0, 0);

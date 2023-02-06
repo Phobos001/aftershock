@@ -29,6 +29,9 @@ alea = "0.2.2"
 soloud = "1.0.2"
 dashmap = {version = "5.4.0", features = ["serde", "rayon"]}
 
+# Memory leak in earlier version, not used by aftershock
+bumpalo = "3.12.0"
+
 [profile.dev]
 opt-level = 3
 

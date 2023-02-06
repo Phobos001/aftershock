@@ -1,5 +1,8 @@
 extern crate device_query;
+use aftershock::vector2::Vector2;
 use device_query::*;
+
+use crate::engine::PlatformerEngine;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ControlKeys {
@@ -23,6 +26,8 @@ pub struct Controls {
     pub input_current: u32,
     pub input_last: u32,
     pub device_state: device_query::DeviceState,
+
+    pub mouse_position: (i32, i32),
 }
 
 impl Controls {
@@ -31,12 +36,20 @@ impl Controls {
             input_current: 0,
             input_last: 0,
             device_state: device_query::DeviceState::new(),
+
+            mouse_position: (PlatformerEngine::RENDER_WIDTH as i32 / 2, PlatformerEngine::RENDER_HEIGHT as i32 / 2),
         }
     }
 
     pub fn update(&mut self) {
         let keys: Vec<Keycode> = self.device_state.query_keymap();
         let mouse: Vec<bool> = self.device_state.query_pointer().button_pressed;
+
+        let new_mouse_position: (i32, i32) = self.device_state.query_pointer().coords;
+
+        self.mouse_position.0 += new_mouse_position.0 - self.mouse_position.0;
+        self.mouse_position.1 += new_mouse_position.1 - self.mouse_position.1;
+
 
         self.input_last = self.input_current;
         self.input_current = 0;

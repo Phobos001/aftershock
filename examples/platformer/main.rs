@@ -45,6 +45,9 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
 
     let video_subsystem = sdl_context.video().unwrap();
 
+
+    sdl_context.mouse().show_cursor(false);
+
     let title = PlatformerEngine::TITLE;
     let window = {
         match engine.fullscreen {
@@ -94,11 +97,12 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    // Timings handled with aftershock timestamp, uses std
     let mut update_timer: f64 = 0.0;
     let mut draw_timer: f64 = 0.0;
 
     let mut delta_now: f64 = aftershock::timestamp();
-    let mut delta_last: f64 = 0.0;
+    let mut delta_last: f64;
 
     let update_rate: f64 = 1.0 / 300.0;
     let draw_rate: f64 = 1.0 / if engine.hardware_canvas { 300.0 } else { 120.0 };
@@ -130,7 +134,21 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
         draw_timer -= dt;
 
         if update_timer <= 0.0 {
+            
             engine.update();
+
+            let mouse_x = engine.controls.mouse_position.0;
+            let mouse_y = engine.controls.mouse_position.1;
+
+            if mouse_x > PlatformerEngine::RENDER_WIDTH as i32 {
+                sdl_context.mouse().warp_mouse_in_window(&canvas.window(), PlatformerEngine::RENDER_WIDTH as i32, mouse_y);
+            }
+
+            if mouse_y > PlatformerEngine::RENDER_HEIGHT as i32 {
+                sdl_context.mouse().warp_mouse_in_window(&canvas.window(), mouse_x, PlatformerEngine::RENDER_HEIGHT as i32);
+            }
+            
+
             update_timer = update_rate;
         }
         

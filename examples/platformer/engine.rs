@@ -1,8 +1,6 @@
-
-
-use aftershock::*;
 use aftershock::buffer::*;
 use aftershock::font::*;
+use aftershock::color::*;
 
 use crate::gamestate::*;
 use crate::controls::*;
@@ -11,7 +9,7 @@ use crate::controls::*;
 
 pub struct PlatformerEngine {
     pub screen: Buffer,
-    pub gamestate: GameState,
+    pub gamestate: Option<GameState>,
 
     pub hardware_canvas: bool,
     pub integer_scaling: bool,
@@ -69,7 +67,7 @@ impl PlatformerEngine {
             main_font,
 
             screen: Buffer::new(PlatformerEngine::RENDER_WIDTH, PlatformerEngine::RENDER_HEIGHT),
-            gamestate: GameState::new(),
+            gamestate: Some(GameState::new()),
 
             controls: Controls::new(),
 
@@ -92,14 +90,21 @@ impl PlatformerEngine {
 	}
 
     pub fn update(&mut self) {
-        
-        let update_time_before: f64 = timestamp();
+        let update_time_before: f64 = aftershock::timestamp();
         self.controls.update();
 
+        if self.gamestate.is_some() {
+            let gamestate = self.gamestate.as_mut().unwrap();
+            gamestate.update(&self.controls, self.dt);
+        }
+        
+        let update_time_after: f64 = aftershock::timestamp();
+        
 
-        self.gamestate.update(&self.controls, self.dt);
 
-        let update_time_after: f64 = timestamp();
+        
+
+
 
         self.profiling_update_time = update_time_after - update_time_before;
 
@@ -110,19 +115,27 @@ impl PlatformerEngine {
     }
 
     pub fn draw(&mut self) {
-        let draw_time_before: f64 = timestamp();
+        let draw_time_before: f64 = aftershock::timestamp();
 
-        self.gamestate.draw(&mut self.screen);
+        if self.gamestate.is_some() {
+            let gamestate = self.gamestate.as_mut().unwrap();
+            gamestate.draw(&mut self.screen);
+        }
 
         
-        let draw_time_after: f64 = timestamp();
+        let draw_time_after: f64 = aftershock::timestamp();
         self.profiling_draw_time = draw_time_after - draw_time_before;
 
-        self.screen.pprint(&self.main_font, format!("UPDATE TIME: {}MS\nDRAW TIME: {}MS\nTICS: {}\nRT: {}s", 
+        self.screen.pprint(&self.main_font, format!("UPDATE TIME: {:.02}MS\nDRAW TIME: {:.02}MS\nTICS: {}\nRT: {:.02}s", 
         (self.profiling_update_time * 100000.0).round() / 100.0, 
         (self.profiling_draw_time * 100000.0).round() / 100.0,
         self.tics, self.realtime),
-        4, 4, 10, None)
+        4, 4, 10, None);
+
+        // Crosshair
+        self.screen.pcircle(false, self.controls.mouse_position.0, self.controls.mouse_position.1, 4, Color::WHITE);
+        self.screen.pline(self.controls.mouse_position.0, self.controls.mouse_position.1 - 6, self.controls.mouse_position.0, self.controls.mouse_position.1 + 6, Color::WHITE);
+        self.screen.pline(self.controls.mouse_position.0 - 6, self.controls.mouse_position.1, self.controls.mouse_position.0 + 6, self.controls.mouse_position.1, Color::WHITE);
     }
 
 }

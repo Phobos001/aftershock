@@ -28,10 +28,13 @@ pub struct GameState {
     pub player: AABB,
     pub is_grabbing_ceiling: bool,
     pub is_grounded: bool,
+
     pub walls: DashMap<(i32, i32), u8>,
 }
 
 impl GameState {
+    pub const TILE_SIZE: i32 = 8;
+
     pub fn new() -> GameState {
         let mut gs = GameState {
             camera_position: Vector2::ZERO,
@@ -53,12 +56,9 @@ impl GameState {
     }
 
     pub fn init(&mut self) {
-        for y in 0..64 {
-            for x in 0..64 {
-                if alea::f32() < (y as f32 / 64.0) {
-                    let position: Vector2 = Vector2::new(16.0 * x as f32, 16.0 * y as f32);
-                    let size: Vector2 = Vector2::new(16.0, 16.0);
-
+        for y in 0..128 {
+            for x in 0..128 {
+                if alea::f32() < (y as f32 / 128.0) {
                     self.walls.insert((x, y), alea::u32_less_than(Wall::Count as u32) as u8);
                 }
             }
@@ -92,23 +92,23 @@ impl GameState {
 
         self.camera_position = Vector2::lerp(self.camera_position, self.player.position, 10.0 * dt);
 
-        let grid_idx: (i32, i32) = ((self.player.position.x / 16.0).ceil() as i32, (self.player.position.y.ceil() / 16.0) as i32);
+        let grid_idx: (i32, i32) = ((self.player.position.x / (GameState::TILE_SIZE as f32)).ceil() as i32, (self.player.position.y.ceil() / (GameState::TILE_SIZE as f32)) as i32);
         
 
         // Get list of nearby walls and sort them from distance to the player                              
         let mut testable_aabbs: Vec<AABB> = Vec::new();
 
 
-        for iy in (grid_idx.1 - 2)..(grid_idx.1 + 2) {
-            for ix in (grid_idx.0 - 2)..(grid_idx.0 + 2) {
+        for iy in (grid_idx.1 - 3)..(grid_idx.1 + 3) {
+            for ix in (grid_idx.0 - 3)..(grid_idx.0 + 3) {
                 let wall_aabb_check = self.walls.get(&(ix, iy));
 
 
                 
                 if wall_aabb_check.is_some() {
 
-                    let wall_aabb_result = wall_aabb_check.unwrap();
-                    testable_aabbs.push(AABB::new(Vector2::new(ix as f32 * 16.0, iy as f32 * 16.0), Vector2::new(16.0, 16.0)));
+                    //let wall_aabb_result = wall_aabb_check.unwrap();
+                    testable_aabbs.push(AABB::new(Vector2::new(ix as f32 * (GameState::TILE_SIZE as f32), iy as f32 * (GameState::TILE_SIZE as f32)), Vector2::new((GameState::TILE_SIZE as f32), (GameState::TILE_SIZE as f32))));
 
                     
                 }
@@ -165,47 +165,47 @@ impl GameState {
         
 
 
-        let grid_idx: (i32, i32) = ((self.camera_position.x / 16.0).ceil() as i32, (self.camera_position.y.ceil() / 16.0) as i32);
+        let grid_idx: (i32, i32) = ((self.camera_position.x / 8.0).ceil() as i32, (self.camera_position.y.ceil() / 8.0) as i32);
         
 
         // Nearby world render
-        for iy in (grid_idx.1 - 13)..(grid_idx.1 + 13) {
-            for ix in (grid_idx.0 - 21)..(grid_idx.0 + 21) {
+        for iy in (grid_idx.1 - 26)..(grid_idx.1 + 26) {
+            for ix in (grid_idx.0 - 42)..(grid_idx.0 + 42) {
                 let wall_aabb_check = self.walls.get(&(ix, iy));
                 if wall_aabb_check.is_some() {
                     let result = wall_aabb_check.unwrap();
                     let wall = result.value();
 
-                    let wall_position = Vector2::new(ix as f32 * 16.0, iy as f32 * 16.0);
+                    let wall_position = Vector2::new(ix as f32 * 8.0, iy as f32 * 8.0);
                 
-                    let wall_screen_position = self.camera_offset(wall_position - (Vector2::ONE * 8.0));
+                    let wall_screen_position = self.camera_offset(wall_position - (Vector2::ONE * ((GameState::TILE_SIZE as f32) / 2.0)));
                     screen.prectangle(true,
                         wall_screen_position.x as i32,
                         wall_screen_position.y as i32,
-                        16, 16,
+                        GameState::TILE_SIZE, GameState::TILE_SIZE,
                         Color::new(128, 128, 128, 255)
                     );
                 }
             }
         }
 
-        let grid_idx: (i32, i32) = ((self.player.position.x / 16.0).ceil() as i32, (self.player.position.y.ceil() / 16.0) as i32);
+        let grid_idx: (i32, i32) = ((self.player.position.x / (GameState::TILE_SIZE as f32)).ceil() as i32, (self.player.position.y.ceil() / (GameState::TILE_SIZE as f32)) as i32);
 
         // Static Collision Check Vis
-        for iy in (grid_idx.1 - 2)..(grid_idx.1 + 2) {
-            for ix in (grid_idx.0 - 2)..(grid_idx.0 + 2) {
+        for iy in (grid_idx.1 - 3)..(grid_idx.1 + 3) {
+            for ix in (grid_idx.0 - 3)..(grid_idx.0 + 3) {
                 let wall_aabb_check = self.walls.get(&(ix, iy));
                 if wall_aabb_check.is_some() {
                     let result = wall_aabb_check.unwrap();
                     let wall = result.value();
 
-                    let wall_position = Vector2::new(ix as f32 * 16.0, iy as f32 * 16.0);
+                    let wall_position = Vector2::new(ix as f32 * (GameState::TILE_SIZE as f32), iy as f32 * (GameState::TILE_SIZE as f32));
 
-                    let wall_screen_position = self.camera_offset(wall_position - (Vector2::ONE * 8.0));
+                    let wall_screen_position = self.camera_offset(wall_position - (Vector2::ONE * ((GameState::TILE_SIZE as f32) / 2.0)));
                     screen.prectangle(false,
                         wall_screen_position.x as i32, 
                         wall_screen_position.y as i32,
-                        16, 16,
+                        GameState::TILE_SIZE, GameState::TILE_SIZE,
                         Color::YELLOW
                     );
                 }

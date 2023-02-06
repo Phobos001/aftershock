@@ -23,6 +23,5 @@ pub mod matrix3;
 
 // Profiling shorthand
 pub fn timestamp() -> f64 {
-    use std::time::SystemTime;
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64()
+    std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs_f64()
 }
