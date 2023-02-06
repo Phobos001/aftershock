@@ -15,6 +15,7 @@ pub struct PlatformerEngine {
     pub integer_scaling: bool,
     pub stretch_fill: bool,
     pub fullscreen: bool,
+    pub exclusive: bool,
 
     pub controls: Controls,
 
@@ -63,6 +64,7 @@ impl PlatformerEngine {
             integer_scaling: true,
             stretch_fill: false,
             fullscreen: true,
+            exclusive: false,
 
             main_font,
 

@@ -21,7 +21,7 @@ pub fn main() {
     for arg in args {
         match arg.as_str() {
             "--fullscreen" => { engine.fullscreen = true; },
-            "--exclusive" => { engine.fullscreen = true; },
+            "--exclusive" => { engine.exclusive = true; },
             "--windowed" => { engine.fullscreen = false; },
             "--hardware-canvas" => { engine.hardware_canvas = true; },
             "--no-integer-scale" => { engine.integer_scaling = false; },
@@ -52,12 +52,21 @@ pub fn start_sdl2(engine: &mut PlatformerEngine) {
     let window = {
         match engine.fullscreen {
             true => {
-                video_subsystem
-                .window(title, PlatformerEngine::RENDER_WIDTH as u32, PlatformerEngine::RENDER_WIDTH as u32)
-                .fullscreen_desktop()
-                .position_centered()
-                .build()
-                .unwrap()
+                if engine.exclusive {
+                    video_subsystem
+                    .window(title, PlatformerEngine::RENDER_WIDTH as u32, PlatformerEngine::RENDER_WIDTH as u32)
+                    .fullscreen()
+                    .position_centered()
+                    .build()
+                    .unwrap()
+                } else {
+                    video_subsystem
+                    .window(title, PlatformerEngine::RENDER_WIDTH as u32, PlatformerEngine::RENDER_WIDTH as u32)
+                    .fullscreen_desktop()
+                    .position_centered()
+                    .build()
+                    .unwrap()
+                }
             },
             false => {
                 video_subsystem
