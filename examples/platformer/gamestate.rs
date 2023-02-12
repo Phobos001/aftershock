@@ -7,20 +7,60 @@ use dashmap::*;
 use crate::aabb::*;
 use crate::controls::*;
 use crate::engine::PlatformerEngine;
+use crate::level::Level;
 
 use aftershock::color::*;
 
-#[repr(u8)]
-pub enum Wall {
-    PrototypeRed        = 0,
-    PrototypeGreen      = 1,
-    PrototypeBlue       = 2,
-    PrototypeYellow     = 3,
-    PrototypeCyan       = 4,
-    PrototypeMagenta    = 5,
-    PrototypeGrey       = 6,
-    Count               = 7,
+pub type WallDrawOp = fn(&mut Buffer, i32, i32);
+
+fn _draw_wall_prototype_red(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::RED
+    );
 }
+
+fn _draw_wall_prototype_blue(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::BLUE
+    );
+}
+
+fn _draw_wall_prototype_green(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::GREEN
+    );
+}
+
+fn _draw_wall_prototype_cyan(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::CYAN
+    );
+}
+
+fn _draw_wall_prototype_magenta(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::MAGENTA
+    );
+}
+
+fn _draw_wall_prototype_yellow(buffer: &mut Buffer, x: i32, y: i32) {
+    buffer.prectangle(true,
+        x, y,
+        GameState::TILE_SIZE, GameState::TILE_SIZE,
+        Color::YELLOW
+    );
+}
+
 
 pub struct GameState {
     pub camera_position: Vector2,
@@ -29,7 +69,7 @@ pub struct GameState {
     pub is_grabbing_ceiling: bool,
     pub is_grounded: bool,
 
-    pub walls: DashMap<(i32, i32), u8>,
+    pub level: Level,
 }
 
 impl GameState {
@@ -41,7 +81,7 @@ impl GameState {
             player: AABB::new(Vector2::new(480.0, -256.0), Vector2::new(14.0, 14.0)),
             is_grabbing_ceiling: false,
             is_grounded: false,
-            walls: DashMap::new(),
+            level: Level::new_prototype_1(),
         };
 
         gs.init();
@@ -56,13 +96,7 @@ impl GameState {
     }
 
     pub fn init(&mut self) {
-        for y in 0..128 {
-            for x in 0..128 {
-                if alea::f32() < (y as f32 / 128.0) {
-                    self.walls.insert((x, y), alea::u32_less_than(Wall::Count as u32) as u8);
-                }
-            }
-        }
+        
     }
 
     pub fn update(&mut self, controls: &Controls, dt: f32) {
@@ -99,9 +133,9 @@ impl GameState {
         let mut testable_aabbs: Vec<AABB> = Vec::new();
 
 
-        for iy in (grid_idx.1 - 3)..(grid_idx.1 + 3) {
-            for ix in (grid_idx.0 - 3)..(grid_idx.0 + 3) {
-                let wall_aabb_check = self.walls.get(&(ix, iy));
+        for iy in (grid_idx.1 - 1)..(grid_idx.1 + 3) {
+            for ix in (grid_idx.0 - 2)..(grid_idx.0 + 2) {
+                let wall_aabb_check = self.level.walls.get(&(ix, iy));
 
 
                 
@@ -116,6 +150,7 @@ impl GameState {
         }
 
         // Sort closest to player
+        // Important otherwise players can snag on further AABB edges.
         testable_aabbs.sort_by(
             |a, b| 
             Vector2::distance(self.player.position, a.position).partial_cmp( 
@@ -171,20 +206,16 @@ impl GameState {
         // Nearby world render
         for iy in (grid_idx.1 - 26)..(grid_idx.1 + 26) {
             for ix in (grid_idx.0 - 42)..(grid_idx.0 + 42) {
-                let wall_aabb_check = self.walls.get(&(ix, iy));
+                let wall_aabb_check = self.level.walls.get(&(ix, iy));
                 if wall_aabb_check.is_some() {
                     let result = wall_aabb_check.unwrap();
-                    let wall = result.value();
+
+                    let wall_value = result.value();
 
                     let wall_position = Vector2::new(ix as f32 * 8.0, iy as f32 * 8.0);
                 
                     let wall_screen_position = self.camera_offset(wall_position - (Vector2::ONE * ((GameState::TILE_SIZE as f32) / 2.0)));
-                    screen.prectangle(true,
-                        wall_screen_position.x as i32,
-                        wall_screen_position.y as i32,
-                        GameState::TILE_SIZE, GameState::TILE_SIZE,
-                        Color::new(128, 128, 128, 255)
-                    );
+                    GameState::draw_wall(screen, *wall_value, wall_screen_position.x as i32, wall_screen_position.y as i32);
                 }
             }
         }
@@ -192,9 +223,9 @@ impl GameState {
         let grid_idx: (i32, i32) = ((self.player.position.x / (GameState::TILE_SIZE as f32)).ceil() as i32, (self.player.position.y.ceil() / (GameState::TILE_SIZE as f32)) as i32);
 
         // Static Collision Check Vis
-        for iy in (grid_idx.1 - 3)..(grid_idx.1 + 3) {
-            for ix in (grid_idx.0 - 3)..(grid_idx.0 + 3) {
-                let wall_aabb_check = self.walls.get(&(ix, iy));
+        for iy in (grid_idx.1 - 1)..(grid_idx.1 + 3) {
+            for ix in (grid_idx.0 - 2)..(grid_idx.0 + 2) {
+                let wall_aabb_check = self.level.walls.get(&(ix, iy));
                 if wall_aabb_check.is_some() {
                     let result = wall_aabb_check.unwrap();
                     let wall = result.value();
@@ -210,6 +241,18 @@ impl GameState {
                     );
                 }
             }
+        }
+    }
+
+    fn draw_wall(buffer: &mut Buffer, wall: u8, x: i32, y: i32) {
+        match wall {
+            0 => { _draw_wall_prototype_red(        buffer, x, y); },
+            1 => { _draw_wall_prototype_blue(       buffer, x, y); },
+            2 => { _draw_wall_prototype_green(      buffer, x, y); },
+            3 => { _draw_wall_prototype_yellow(     buffer, x, y); },
+            4 => { _draw_wall_prototype_magenta(    buffer, x, y); },
+            5 => { _draw_wall_prototype_cyan(       buffer, x, y); },
+            _ => {}
         }
     }
 }

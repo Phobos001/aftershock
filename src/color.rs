@@ -57,7 +57,7 @@ impl Color {
 	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
-		let alpha: u32 = u32::wrapping_sub(src.a as u32, (255 - opacity) as u32);
+		let alpha: u32 = u32::saturating_sub(src.a as u32, (255 - opacity) as u32);
 
 		let sr: u32 = src.r as u32;
 		let sg: u32 = src.g as u32;
@@ -67,9 +67,9 @@ impl Color {
 		let dg: u32 = dst.g as u32;
 		let db: u32 = dst.b as u32;
 
-		let r = ((sr * alpha) + (dr * (u32::wrapping_sub(255, alpha)))) >> 8;
-		let g = ((sg * alpha) + (dg * (u32::wrapping_sub(255, alpha)))) >> 8;
-		let b = ((sb * alpha) + (db * (u32::wrapping_sub(255, alpha)))) >> 8;
+		let r = ((sr * alpha) + (dr * (u32::saturating_sub(255, alpha)))) >> 8;
+		let g = ((sg * alpha) + (dg * (u32::saturating_sub(255, alpha)))) >> 8;
+		let b = ((sb * alpha) + (db * (u32::saturating_sub(255, alpha)))) >> 8;
 
 		Color { r: r as u8, g: g as u8, b: b as u8, a: 255}
 
@@ -107,13 +107,12 @@ impl Color {
 	}
 
 	pub fn lerp_rgb(c1: Color, c2: Color, t: f32) -> Color {
-		let tb = (f32::clamp(t, 0.0, 1.0) / 255.0) as u8;
-		let mut cf: Color = Color::CLEAR;
+		let tb = (f32::clamp(t, 0.0, 1.0) * 255.0) as u8;
+		let mut cf: Color = c1;
 
 		cf.r = c1.r + (c2.r - c1.r) * tb;
 		cf.g = c1.g + (c2.g - c1.g) * tb;
 		cf.b = c1.b + (c2.b - c1.b) * tb;
-		cf.a = c1.a;
 
 		cf
 	}
@@ -137,10 +136,10 @@ impl std::ops::Sub for Color {
 
 	fn sub(self, rhs: Self) -> Self {
 		Color::new(
-			self.r - rhs.r,
-			self.g - rhs.g,
-			self.b - rhs.b,
-			self.a - rhs.a,
+			u8::saturating_sub(self.r, rhs.r),
+			u8::saturating_sub(self.g, rhs.g),
+			u8::saturating_sub(self.b, rhs.b),
+			u8::saturating_sub(self.a, rhs.a)
 		)
 	}
 }
@@ -171,10 +170,10 @@ impl std::ops::Div for Color {
 
 	fn div(self, rhs: Self) -> Self {
 		Color::new(
-			self.r / rhs.r,
-			self.g / rhs.g,
-			self.b / rhs.b,
-			self.a / rhs.a,
+			u8::saturating_div(self.r, rhs.r),
+			u8::saturating_div(self.g, rhs.g),
+			u8::saturating_div(self.b, rhs.b),
+			u8::saturating_div(self.a, rhs.a)
 		)
 	}
 }
@@ -182,10 +181,10 @@ impl std::ops::Div for Color {
 impl std::ops::AddAssign for Color {
 	fn add_assign(&mut self, rhs: Self) {
         *self = Color::new(
-			self.r + rhs.r,
-			self.g + rhs.g,
-			self.b + rhs.b,
-			self.a + rhs.a,
+			u8::saturating_add(self.r, rhs.r),
+			u8::saturating_add(self.g, rhs.g),
+			u8::saturating_add(self.b, rhs.b),
+			u8::saturating_add(self.a, rhs.a)
 		);
     }
 }
@@ -193,10 +192,10 @@ impl std::ops::AddAssign for Color {
 impl std::ops::SubAssign for Color {
 	fn sub_assign(&mut self, rhs: Self) {
         *self = Color::new(
-			self.r - rhs.r,
-			self.g - rhs.g,
-			self.b - rhs.b,
-			self.a - rhs.a,
+			u8::saturating_sub(self.r, rhs.r),
+			u8::saturating_sub(self.g, rhs.g),
+			u8::saturating_sub(self.b, rhs.b),
+			u8::saturating_sub(self.a, rhs.a)
 		);
     }
 }
@@ -223,10 +222,10 @@ impl std::ops::MulAssign for Color {
 impl std::ops::DivAssign for Color {
 	fn div_assign(&mut self, rhs: Self) {
         *self = Color::new(
-			self.r / rhs.r,
-			self.g / rhs.g,
-			self.b / rhs.b,
-			self.a / rhs.a,
+			u8::saturating_div(self.r, rhs.r),
+			u8::saturating_div(self.g, rhs.g),
+			u8::saturating_div(self.b, rhs.b),
+			u8::saturating_div(self.a, rhs.a)
 		);
     }
 }

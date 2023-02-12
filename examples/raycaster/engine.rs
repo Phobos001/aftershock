@@ -1,15 +1,15 @@
 use aftershock::buffer::*;
 use aftershock::font::*;
 use aftershock::color::*;
+use aftershock::vector2::*;
 
-use crate::gamestate::*;
 use crate::controls::*;
+use crate::level::Level;
 
 
-
-pub struct PlatformerEngine {
+pub struct RaycastEngine {
     pub screen: Buffer,
-    pub gamestate: Option<GameState>,
+    pub pattern_test: Buffer,
 
     pub hardware_canvas: bool,
     pub integer_scaling: bool,
@@ -17,12 +17,13 @@ pub struct PlatformerEngine {
     pub fullscreen: bool,
     pub exclusive: bool,
 
+    pub level: Level,
+
     pub controls: Controls,
 
     pub paused: bool,
 
     pub main_font: Font,
-    pub cursor: Buffer,
 
     pub tics: u64,
     pub realtime: f32,
@@ -38,18 +39,16 @@ pub struct PlatformerEngine {
 
     pub is_quitting: bool,
 
-    
-
 }
 
-impl PlatformerEngine {
-    pub const TITLE: &str = "Platformer Example";
+impl RaycastEngine {
+    pub const TITLE: &str = "Raycast Engine";
 
-    pub const RENDER_WIDTH: usize = 640;
-    pub const RENDER_HEIGHT: usize = 360;
+    pub const RENDER_WIDTH: usize = 256;
+    pub const RENDER_HEIGHT: usize = 256;
 
-    pub fn new() -> PlatformerEngine {
-        println!("== Platformer Example ==");
+    pub fn new() -> RaycastEngine {
+        println!("== Raycast Engine ==");
 
         // Font images will be read left-to-right, top-to-bottom. 
         // This will tell the Font what character goes to what part of the image.
@@ -60,18 +59,19 @@ impl PlatformerEngine {
             Err(_) => { Font::default() },
         };
 
-        PlatformerEngine {
+        RaycastEngine {
             hardware_canvas: false,
             integer_scaling: true,
             stretch_fill: false,
             fullscreen: true,
             exclusive: false,
 
-            main_font,
-            cursor: Buffer::new_from_image("shared_assets/curssor.png").unwrap_or_default(),
+            level: Level::new(),
 
-            screen: Buffer::new(PlatformerEngine::RENDER_WIDTH, PlatformerEngine::RENDER_HEIGHT),
-            gamestate: Some(GameState::new()),
+            main_font,
+
+            screen: Buffer::new(RaycastEngine::RENDER_WIDTH, RaycastEngine::RENDER_HEIGHT),
+            pattern_test: Buffer::new_from_image("shared_assets/patterntest.png").unwrap(),
 
             controls: Controls::new(),
 
@@ -97,17 +97,31 @@ impl PlatformerEngine {
         let update_time_before: f64 = aftershock::timestamp();
         self.controls.update();
 
-        if self.gamestate.is_some() {
-            let gamestate = self.gamestate.as_mut().unwrap();
-            gamestate.update(&self.controls, self.dt);
+        if self.controls.is_control_down(ControlKeys::MoveForward) {
+            self.level.camera_position += Vector2::new(0.0, -1.0).rotated(-self.level.camera_rotation) * 4.0 * self.dt;
+        }
+
+        if self.controls.is_control_down(ControlKeys::MoveBackward) {
+            self.level.camera_position += Vector2::new(0.0, 1.0).rotated(-self.level.camera_rotation) * 4.0 * self.dt;
+        }
+
+        if self.controls.is_control_down(ControlKeys::StrafeLeft) {
+            self.level.camera_position += Vector2::new(-1.0, 0.0).rotated(-self.level.camera_rotation) * 4.0 * self.dt;
+        }
+
+        if self.controls.is_control_down(ControlKeys::StrafeRight) {
+            self.level.camera_position += Vector2::new(1.0, 0.0).rotated(-self.level.camera_rotation) * 4.0 * self.dt;
+        }
+
+        if self.controls.is_control_down(ControlKeys::TurnLeft) {
+            self.level.camera_rotation += (90.0 as f32).to_radians() * self.dt;
+        }
+
+        if self.controls.is_control_down(ControlKeys::TurnRight) {
+            self.level.camera_rotation -= (90.0 as f32).to_radians() * self.dt;
         }
         
         let update_time_after: f64 = aftershock::timestamp();
-        
-
-
-        
-
 
 
         self.profiling_update_time = update_time_after - update_time_before;
@@ -121,10 +135,9 @@ impl PlatformerEngine {
     pub fn draw(&mut self) {
         let draw_time_before: f64 = aftershock::timestamp();
 
-        if self.gamestate.is_some() {
-            let gamestate = self.gamestate.as_mut().unwrap();
-            gamestate.draw(&mut self.screen);
-        }
+        self.screen.clear();
+
+        crate::raycaster::draw_sector(&self.level, 0, &mut self.screen, self.level.camera_position, self.level.camera_rotation, 1.5, 0.0);
 
         
         let draw_time_after: f64 = aftershock::timestamp();
@@ -137,7 +150,9 @@ impl PlatformerEngine {
         4, 4, 10, None);
 
         // Cursor
-        self.screen.pimg(&self.cursor, self.controls.mouse_position.0, self.controls.mouse_position.1);
+        self.screen.pcircle(false, self.controls.mouse_position.0, self.controls.mouse_position.1, 4, Color::WHITE);
+        self.screen.pline(self.controls.mouse_position.0, self.controls.mouse_position.1 - 6, self.controls.mouse_position.0, self.controls.mouse_position.1 + 6, Color::WHITE);
+        self.screen.pline(self.controls.mouse_position.0 - 6, self.controls.mouse_position.1, self.controls.mouse_position.0 + 6, self.controls.mouse_position.1, Color::WHITE);
     }
 
 }

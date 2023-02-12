@@ -54,7 +54,13 @@ pub fn determinant(a: f32, b: f32, c: f32, d: f32) -> f32 {
 	a * d - b * c
 }
 
+pub fn mapi(value: i32, low1: i32, high1: i32, low2: i32, high2: i32) -> i32 {
+	low2 + (value - low1) * (high2 - low2) / (high1 - low1)
+}
 
+pub fn mapf(value: f32, low1: f32, high1: f32, low2: f32, high2: f32) -> f32 {
+	low2 + (value - low1) * (high2 - low2) / (high1 - low1)
+}
 
 pub fn intersection(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> Option<Vector2> {
 	let a1: f32 = p1_end.y - p1_start.y;

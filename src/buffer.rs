@@ -210,7 +210,7 @@ fn pset_inverted_bg_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
     buffer.drawn_pixels_since_clear += 1;
 }
 
-/// Drawing switchboard that draws directly into a  Drawing options like Tint and Opacity must be manually changed by the user.
+/// Image in memory with operations to modify it. Pixel modification functions are 
 #[derive(Clone)]
 pub struct Buffer {
     pset_op: PSetOp,
@@ -489,6 +489,19 @@ impl Buffer {
         (self.pset_op)(self, idx, color);
     }
 
+    /// Draws a pixel to the color buffer, using the Buffers set DrawMode. DrawMode defaults to Opaque.
+    /// This variant of pset has no array bounds protections and will trigger a panic if a pixel is placed
+    /// outside of the buffer length.
+    pub fn pset_panic_oob(&mut self, x: i32, y: i32, color: Color) {
+        self.drawn_pixels_since_clear += 1;
+
+        let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
+
+
+        // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
+        (self.pset_op)(self, idx, color);
+    }
+
     /// Gets a color from the color buffer.
     pub fn pget(&self, x: i32, y: i32) -> Color {
 
@@ -564,24 +577,15 @@ impl Buffer {
 
             for py in y0..y1 {
                 for px in x0..x1 {
-                    self.pset(px, py, color);
+                    self.pset_panic_oob(px, py, color);
                 }
             }
         } else {
-            let x0 = x;
-            let x1 = x + w;
-            let y0 = y;
-            let y1 = y + h;
+            self.pline(x, y, x + w, y, color);
+            self.pline(x, y + h, x + w, y + h, color);
 
-            for tops in x0..x1+1 {
-                self.pset(tops, y0, color);
-                self.pset(tops, y1, color);
-            }
-
-            for sides in y0..y1 {
-                self.pset(x0, sides, color);
-                self.pset(x1, sides, color);
-            }
+            self.pline(x + w, y, x + w, y + h, color);
+            self.pline(x, y, x, y + h, color);
         }
     }
 
@@ -589,10 +593,10 @@ impl Buffer {
     /// Implementation found here: https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
     pub fn ptriangle(&mut self, filled: bool, x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) {
         if filled {
-            let xmin = i32::min(x0, i32::min(x1, x2));
-            let xmax = i32::max(x0, i32::max(x1, x2));
-            let ymin = i32::min(y0, i32::min(y1, y2));
-            let ymax = i32::max(y0, i32::max(y1, y2));
+            let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.width as i32);
+            let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.width as i32);
+            let ymin = i32::clamp(i32::min(y0, i32::min(y1, y2)), 0, self.width as i32);
+            let ymax = i32::clamp(i32::max(y0, i32::max(y1, y2)), 0, self.width as i32);
 
             for iy in ymin..ymax {
                 for ix in xmin..xmax {
@@ -607,7 +611,7 @@ impl Buffer {
                     let is_inside: bool = !(has_neg && has_pos);
 
                     if is_inside {
-                        self.pset(ix, iy, color);
+                        self.pset_panic_oob(ix, iy, color);
                     }
                 }
             }
@@ -967,5 +971,36 @@ impl Buffer {
         }
 
         return pixel_count;
+    }
+}
+
+impl Default for Buffer {
+    fn default() -> Self {
+        let mut missing: Buffer = Buffer::new(32, 32);
+
+        missing.clear_color(Color::RED);
+
+        for iy in 0..16 {
+            for ix in 0..16 {
+                let color: Color = if iy % 2 == 0 { 
+                    if ix % 2 == 1 { 
+                        Color::MAGENTA
+                    } else {
+                        Color::BLACK
+                    }
+                } else { 
+                    if ix % 2 == 0 { 
+                        Color::MAGENTA
+                    } else {
+                        Color::BLACK
+                    }
+                };
+                
+
+                missing.prectangle(true, ix * 4, iy * 4, 4, 4, color);
+            }
+        }
+
+        missing
     }
 }
