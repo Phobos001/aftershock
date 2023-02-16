@@ -5,10 +5,11 @@ use aftershock::vector2::*;
 
 use crate::controls::*;
 use crate::level::Level;
+use crate::renderer::Renderer;
 
 
-pub struct RaycastEngine {
-    pub screen: Buffer,
+pub struct RebuiltEngine {
+    pub renderer: Renderer,
     pub pattern_test: Buffer,
 
     pub hardware_canvas: bool,
@@ -41,13 +42,13 @@ pub struct RaycastEngine {
 
 }
 
-impl RaycastEngine {
-    pub const TITLE: &str = "Raycast Engine";
+impl RebuiltEngine {
+    pub const TITLE: &str = "Rebuilt Engine";
 
-    pub const RENDER_WIDTH: usize = 256;
-    pub const RENDER_HEIGHT: usize = 256;
+    pub const RENDER_WIDTH: usize = 1920;
+    pub const RENDER_HEIGHT: usize = 1080;
 
-    pub fn new() -> RaycastEngine {
+    pub fn new() -> RebuiltEngine {
         println!("== Raycast Engine ==");
 
         // Font images will be read left-to-right, top-to-bottom. 
@@ -59,7 +60,7 @@ impl RaycastEngine {
             Err(_) => { Font::default() },
         };
 
-        RaycastEngine {
+        RebuiltEngine {
             hardware_canvas: false,
             integer_scaling: true,
             stretch_fill: false,
@@ -70,7 +71,7 @@ impl RaycastEngine {
 
             main_font,
 
-            screen: Buffer::new(RaycastEngine::RENDER_WIDTH, RaycastEngine::RENDER_HEIGHT),
+            renderer: Renderer::new(RebuiltEngine::RENDER_WIDTH, RebuiltEngine::RENDER_HEIGHT, 16),
             pattern_test: Buffer::new_from_image("shared_assets/patterntest.png").unwrap(),
 
             controls: Controls::new(),
@@ -135,24 +136,27 @@ impl RaycastEngine {
     pub fn draw(&mut self) {
         let draw_time_before: f64 = aftershock::timestamp();
 
-        self.screen.clear();
+        self.renderer.screen.clear();
 
-        crate::raycaster::draw_sector(&self.level, 0, &mut self.screen, self.level.camera_position, self.level.camera_rotation, 1.5, 0.0);
+        self.renderer.draw_sector(&self.level, 0, self.level.camera_position, self.level.camera_rotation,
+            1.5, 0.0);
 
         
         let draw_time_after: f64 = aftershock::timestamp();
         self.profiling_draw_time = draw_time_after - draw_time_before;
 
-        self.screen.pprint(&self.main_font, format!("UPDATE TIME: {:.02}MS\nDRAW TIME: {:.02}MS\nTICS: {}\nRT: {:.02}s", 
+        self.renderer.screen.set_draw_mode(DrawMode::InvertedBgOpaque);
+        self.renderer.screen.pprint(&self.main_font, format!("UPDATE TIME: {:.02}MS\nDRAW TIME: {:.02}MS\nTICS: {}\nRT: {:.02}s", 
         (self.profiling_update_time * 100000.0).round() / 100.0, 
         (self.profiling_draw_time * 100000.0).round() / 100.0,
         self.tics, self.realtime),
         4, 4, 10, None);
+        self.renderer.screen.set_draw_mode(DrawMode::Opaque);
 
         // Cursor
-        self.screen.pcircle(false, self.controls.mouse_position.0, self.controls.mouse_position.1, 4, Color::WHITE);
-        self.screen.pline(self.controls.mouse_position.0, self.controls.mouse_position.1 - 6, self.controls.mouse_position.0, self.controls.mouse_position.1 + 6, Color::WHITE);
-        self.screen.pline(self.controls.mouse_position.0 - 6, self.controls.mouse_position.1, self.controls.mouse_position.0 + 6, self.controls.mouse_position.1, Color::WHITE);
+        self.renderer.screen.pcircle(false, self.controls.mouse_position.0, self.controls.mouse_position.1, 4, Color::WHITE);
+        self.renderer.screen.pline(self.controls.mouse_position.0, self.controls.mouse_position.1 - 6, self.controls.mouse_position.0, self.controls.mouse_position.1 + 6, Color::WHITE);
+        self.renderer.screen.pline(self.controls.mouse_position.0 - 6, self.controls.mouse_position.1, self.controls.mouse_position.0 + 6, self.controls.mouse_position.1, Color::WHITE);
     }
 
 }

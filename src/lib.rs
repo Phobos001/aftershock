@@ -5,6 +5,7 @@
 
 #![crate_name = "aftershock"]
 #![crate_type = "lib"]
+#![feature(portable_simd)]
 
 // Core
 pub mod buffer;

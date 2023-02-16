@@ -109,7 +109,7 @@ pub fn main() {
         });
 
         // Draw smaller checkerboard on thread 2
-            let buffer2_ref: &mut Buffer = &mut buffer2;
+        let buffer2_ref: &mut Buffer = &mut buffer2;
         let _ = s.spawn(move || {
             for iy in 0..32 {
                 for ix in 0..32 {

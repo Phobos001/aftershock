@@ -1,7 +1,7 @@
 extern crate device_query;
 use device_query::*;
 
-use crate::engine::RaycastEngine;
+use crate::engine::RebuiltEngine;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ControlKeys {
@@ -33,7 +33,7 @@ impl Controls {
             input_last: 0,
             device_state: device_query::DeviceState::new(),
 
-            mouse_position: (RaycastEngine::RENDER_WIDTH as i32 / 2, RaycastEngine::RENDER_HEIGHT as i32 / 2),
+            mouse_position: (RebuiltEngine::RENDER_WIDTH as i32 / 2, RebuiltEngine::RENDER_HEIGHT as i32 / 2),
         }
     }
 

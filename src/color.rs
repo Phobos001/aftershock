@@ -1,5 +1,7 @@
 /// 32-bit Color using  1-byte channels for Red, Green, Blue, and Alpha.
 
+use std::simd::*;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Color {
 	pub r: u8,
@@ -72,6 +74,25 @@ impl Color {
 		let b = ((sb * alpha) + (db * (u32::saturating_sub(255, alpha)))) >> 8;
 
 		Color { r: r as u8, g: g as u8, b: b as u8, a: 255}
+
+	}
+
+	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
+	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
+	pub fn blend_fast_simd(src: Color, dst: Color, opacity: u8) -> Color {
+		let alpha: u16 = u16::saturating_sub(src.a as u16, (255 - opacity) as u16);
+		let simd_alpha: u16x4 = u16x4::splat(u16::saturating_sub(src.a as u16, (255 - opacity) as u16));
+
+		let simd_src: u16x4 = u16x4::from_array([src.r as u16, src.g as u16, src.b as u16, src.a as u16]);
+		let simd_dst: u16x4 = u16x4::from_array([dst.r as u16, dst.g as u16, dst.b as u16, dst.a as u16]);
+
+		let simd_blend_factor: u16x4 = u16x4::splat(u16::saturating_sub(255, alpha));
+
+		let simd_bitshift: u16x4 = u16x4::splat(8);
+
+		let simd_fc = ((simd_src * simd_alpha) + (simd_dst * simd_blend_factor)) >> simd_bitshift;
+
+		Color { r: simd_fc[0] as u8, g: simd_fc[1] as u8, b: simd_fc[2] as u8, a: 255}
 
 	}
 

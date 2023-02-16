@@ -13,17 +13,19 @@ use crate::engine::*;
 pub struct Line {
     pub start: Vector2,
     pub end: Vector2,
-    pub height_bottom: f32,
-    pub height_top: f32,
     pub flipped: bool,
+    pub tint: Color,
 }
 
 pub struct Sector {
-    pub lines: Vec<Line>,
+    pub lines: Vec<usize>,
+    pub height_floor: f32,
+    pub height_ceiling: f32,
 }
 
 pub struct Level {
     pub sectors: Vec<Sector>,
+    pub lines: Vec<Line>,
     pub camera_position: Vector2,
     pub camera_rotation: f32,
     pub textures: Arc<DashMap<String, Buffer>>,
@@ -39,37 +41,37 @@ impl Level {
             sectors: vec![
                 Sector {
                     lines: vec![
-                        Line {
-                            start: Vector2::new(-10.0, -10.0),
-                            end: Vector2::new(10.0, -10.0),
-                            height_bottom: 0.0,
-                            height_top: 5.0,
-                            flipped: false,
-                        },
-                        Line {
-                            start: Vector2::new(10.0, -10.0),
-                            end: Vector2::new(10.0, 10.0),
-                            height_bottom: 0.0,
-                            height_top: 5.0,
-                            flipped: false,
-                        },
-                        Line {
-                            start: Vector2::new(10.0, 10.0),
-                            end: Vector2::new(-10.0, 10.0),
-                            height_bottom: 0.0,
-                            height_top: 5.0,
-                            flipped: false,
-                        },
-                        Line {
-                            start: Vector2::new(-10.0, 10.0),
-                            end: Vector2::new(-10.0, -10.0),
-                            height_bottom: 0.0,
-                            height_top: 5.0,
-                            flipped: false,
-                        },
-                        
-                    ]
+                        0, 1, 2, 3
+                    ],
+                    height_floor: 0.0,
+                    height_ceiling: 5.0,
                 }
+            ],
+            lines: vec![
+                Line {
+                    start: Vector2::new(-10.0, -10.0),
+                    end: Vector2::new(10.0, -10.0),
+                    flipped: false,
+                    tint: Color::GREEN,
+                },
+                Line {
+                    start: Vector2::new(10.0, -10.0),
+                    end: Vector2::new(10.0, 10.0),
+                    flipped: false,
+                    tint: Color::RED,
+                },
+                Line {
+                    start: Vector2::new(10.0, 10.0),
+                    end: Vector2::new(-10.0, 10.0),
+                    flipped: false,
+                    tint: Color::BLUE,
+                },
+                Line {
+                    start: Vector2::new(-10.0, 10.0),
+                    end: Vector2::new(-10.0, -10.0),
+                    flipped: false,
+                    tint: Color::YELLOW,
+                },
             ],
             camera_position: Vector2::ZERO,
             camera_rotation: 0.0,
