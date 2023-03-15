@@ -141,6 +141,13 @@ impl Vector2 {
 		}
 	}
 
+	pub fn unlerp(v0: Vector2, v1: Vector2, v2: Vector2) -> f32 {
+		let dist1 = Vector2::distance(v1, v2);
+		let dist2 = Vector2::distance(v1, v0);
+
+		dist2 / dist1
+	}
+
 	pub fn inverse(&self) -> Vector2 {
 		Vector2::new(1.0 / self.x, 1.0 / self.y)
 	}

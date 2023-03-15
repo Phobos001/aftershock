@@ -13,8 +13,6 @@ use crate::engine::*;
 pub struct Line {
     pub start: Vector2,
     pub end: Vector2,
-    pub flipped: bool,
-    pub tint: Color,
 }
 
 pub struct Sector {
@@ -31,11 +29,17 @@ pub struct Level {
     pub textures: Arc<DashMap<String, Buffer>>,
 }
 
+impl Line {
+    pub fn new(start: Vector2, end: Vector2) -> Line {
+        Line { start, end }
+    }
+}
+
 impl Level {
     pub fn new() -> Level {
 
         let textures: Arc<DashMap<String, Buffer>> = Arc::new(DashMap::new());
-        textures.insert("pattern_test".to_string(), Buffer::new_from_image("shared_assets/patterntest.png").unwrap());
+        textures.insert("pattern_test".to_string(), Buffer::new_from_image("examples/raycaster/textures/prototype/prototype_grid.png").unwrap());
 
         Level {
             sectors: vec![
@@ -51,26 +55,18 @@ impl Level {
                 Line {
                     start: Vector2::new(-10.0, -10.0),
                     end: Vector2::new(10.0, -10.0),
-                    flipped: false,
-                    tint: Color::GREEN,
                 },
                 Line {
                     start: Vector2::new(10.0, -10.0),
                     end: Vector2::new(10.0, 10.0),
-                    flipped: false,
-                    tint: Color::RED,
                 },
                 Line {
                     start: Vector2::new(10.0, 10.0),
                     end: Vector2::new(-10.0, 10.0),
-                    flipped: false,
-                    tint: Color::BLUE,
                 },
                 Line {
                     start: Vector2::new(-10.0, 10.0),
                     end: Vector2::new(-10.0, -10.0),
-                    flipped: false,
-                    tint: Color::YELLOW,
                 },
             ],
             camera_position: Vector2::ZERO,

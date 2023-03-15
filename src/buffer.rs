@@ -1,6 +1,4 @@
 use rayon::prelude::*;
-use std::thread::scope;
-use std::simd;
 
 use crate::color::*;
 use crate::math;
@@ -301,7 +299,7 @@ impl Buffer {
 			},
 			Err(reason) => {
 				println!("ERROR - IMAGE: Could not load {} | {}", path_to, reason);
-				Err(format!("ERROR - IMAGE: Could not load {} | {}", path_to, reason))
+				Ok(Buffer::default())
 			}
 		}
     }
@@ -563,6 +561,39 @@ impl Buffer {
                 error = error + dx;
                 y0 = y0 + sy;
             }
+        }
+    }
+
+    /// Draws a line across two points using Brensenham Line algorithm from Wikipedia
+    pub fn plinetex(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, u: i32, v: i32, du: i32, dv: i32, buffer: &Buffer) {
+        let (mut x0, mut y0) = (x0, y0);
+        let (mut u, mut v) = (u, v);
+
+        let dx = i32::abs(x1 - x0);
+        let sx = if x0 < x1 {1} else {-1};
+        let dy = -i32::abs(y1 - y0);
+        let sy = if y0 < y1 {1} else {-1};
+        let mut error = dx + dy;
+        
+        loop {
+            let color = buffer.pget_wrap(u, v);
+            self.pset(x0, y0, color);
+
+            if x0 == x1 && y0 == y1 { break; }
+            let e2 = 2 * error;
+            if e2 >= dy {
+                if x0 == x1 { break; }
+                error = error + dy;
+                x0 = x0 + sx;
+            }
+            if e2 <= dx {
+                if y0 == y1 { break; }
+                error = error + dx;
+                y0 = y0 + sy;
+            }
+
+            u += du;
+            v += dv;
         }
     }
     
@@ -917,7 +948,7 @@ impl Buffer {
             let src = Color::new(c2[0], c2[1], c2[2], c2[3]);
             let dst = Color::new(c1[0], c1[1], c1[2], c1[3]);
 
-            let fc = Color::blend_fast_simd(dst, src, 255 - opacity);
+            let fc = Color::blend_fast(dst, src, 255 - opacity);
 
             c1[0] = fc.r;
             c1[1] = fc.g;
@@ -933,7 +964,7 @@ impl Buffer {
             let src = Color::new(c2[0], c2[1], c2[2], c2[3]);
             let dst = Color::new(c1[0], c1[1], c1[2], c1[3]);
 
-            let fc = Color::blend_fast_simd(dst, src, 255) * src;
+            let fc = Color::blend_fast(dst, src, 255) * src;
 
             c1[0] = fc.r;
             c1[1] = fc.g;

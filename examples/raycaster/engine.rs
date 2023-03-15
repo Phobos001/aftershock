@@ -45,8 +45,8 @@ pub struct RebuiltEngine {
 impl RebuiltEngine {
     pub const TITLE: &str = "Rebuilt Engine";
 
-    pub const RENDER_WIDTH: usize = 1920;
-    pub const RENDER_HEIGHT: usize = 1080;
+    pub const RENDER_WIDTH: usize = 960;
+    pub const RENDER_HEIGHT: usize = 540;
 
     pub fn new() -> RebuiltEngine {
         println!("== Raycast Engine ==");
@@ -71,8 +71,8 @@ impl RebuiltEngine {
 
             main_font,
 
-            renderer: Renderer::new(RebuiltEngine::RENDER_WIDTH, RebuiltEngine::RENDER_HEIGHT, 16),
-            pattern_test: Buffer::new_from_image("shared_assets/patterntest.png").unwrap(),
+            renderer: Renderer::new(RebuiltEngine::RENDER_WIDTH, RebuiltEngine::RENDER_HEIGHT, 1),
+            pattern_test: Buffer::new_from_image("textures/prototype/prototype_grid.png").unwrap(),
 
             controls: Controls::new(),
 
@@ -138,8 +138,12 @@ impl RebuiltEngine {
 
         self.renderer.screen.clear();
 
-        self.renderer.draw_sector(&self.level, 0, self.level.camera_position, self.level.camera_rotation,
-            1.5, 0.0);
+        self.renderer.position = self.level.camera_position;
+        self.renderer.rotation = self.level.camera_rotation;
+        self.renderer.height = 1.5;
+        self.renderer.look = 0.0;
+
+        self.renderer.draw_sector(&self.level, 0);
 
         
         let draw_time_after: f64 = aftershock::timestamp();

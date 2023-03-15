@@ -56,10 +56,10 @@ impl Color {
 		Color { r, g, b, a}
 	}
 
-	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
+ 	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
 	pub fn blend_fast(src: Color, dst: Color, opacity: u8) -> Color {
-		let alpha: u32 = u32::saturating_sub(src.a as u32, (255 - opacity) as u32);
+		let alpha: u32 = (src.a as u32 - (255 - opacity) as u32);
 
 		let sr: u32 = src.r as u32;
 		let sg: u32 = src.g as u32;
@@ -69,13 +69,14 @@ impl Color {
 		let dg: u32 = dst.g as u32;
 		let db: u32 = dst.b as u32;
 
-		let r = ((sr * alpha) + (dr * (u32::saturating_sub(255, alpha)))) >> 8;
-		let g = ((sg * alpha) + (dg * (u32::saturating_sub(255, alpha)))) >> 8;
-		let b = ((sb * alpha) + (db * (u32::saturating_sub(255, alpha)))) >> 8;
+		let r = ((sr * alpha) + (dr * (255 - alpha))) >> 8;
+		let g = ((sg * alpha) + (dg * (255 - alpha))) >> 8;
+		let b = ((sb * alpha) + (db * (255 - alpha))) >> 8;
 
 		Color { r: r as u8, g: g as u8, b: b as u8, a: 255}
 
 	}
+
 
 	/// Faster but less accurate alpha-blending function. Used in rasterizer since it's accurate enough and removes branching in hot code
 	/// <https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm>
