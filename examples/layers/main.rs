@@ -2,6 +2,7 @@ extern crate sdl2;
 
 use aftershock::buffer::*;
 use aftershock::color::*;
+use aftershock::shader::*;
 
 use aftershock::timestamp;
 use sdl2::event::Event;
@@ -46,14 +47,13 @@ pub fn main() {
     // Faded light sprite for buffer4
     let mut light_sprite: Buffer = Buffer::new(256, 256);
     {
-        light_sprite.set_draw_mode(DrawMode::Alpha);
+        light_sprite.add_shader(BufferShader::new( Box::new(ShaderAlpha{ opacity: 3 }), true, 0));
         
         for step in 0..128 {
-            light_sprite.opacity = 3;
             light_sprite.pcircle(true, 128, 128, step as i32, Color::WHITE)
         }
 
-        light_sprite.set_draw_mode(DrawMode::Opaque);
+        light_sprite.clear_shaders();
     }
 
     let bake_time_before: f64 = timestamp();
@@ -151,20 +151,28 @@ pub fn main() {
         let buffer4_ref: &mut Buffer = &mut buffer4;
         let _ = s.spawn(move || {
             
-            buffer4_ref.set_draw_mode(DrawMode::Addition);
+            buffer4_ref.add_shader(BufferShader { shader: Box::new(ShaderTint { tint: Color::RED }) , active: false, order: 0 });
+            buffer4_ref.add_shader(BufferShader { shader: Box::new(ShaderTint { tint: Color::GREEN }) , active: false, order: 1 });
+            buffer4_ref.add_shader(BufferShader { shader: Box::new(ShaderTint { tint: Color::BLUE }) , active: false, order: 2 });
+            buffer4_ref.add_shader(BufferShader { shader: Box::new(ShaderAddition) , active: true, order: 3 });
+            
 
-            buffer4_ref.opacity = 255;
             buffer4_ref.pimgmtx(&light_sprite, 256.0, 256.0, 0.0, 1.5, 1.5, 0.5, 0.5);
-            buffer4_ref.opacity = 255;
 
-            buffer4_ref.tint = Color::RED;
+            buffer4_ref.shader_stack[0].active = true;
             buffer4_ref.pimgmtx(&light_sprite, 128.0, 128.0, 0.0, 0.75, 0.75, 0.5, 0.5);
-            buffer4_ref.tint = Color::GREEN;
-            buffer4_ref.pimgmtx(&light_sprite, 384.0, 128.0, 0.0, 0.75, 0.75, 0.5, 0.5);
-            buffer4_ref.tint = Color::BLUE;
-            buffer4_ref.pimgmtx(&light_sprite, 384.0, 384.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+            buffer4_ref.shader_stack[0].active = false;
 
-            buffer4_ref.set_draw_mode(DrawMode::Opaque);
+             buffer4_ref.shader_stack[1].active = true;
+            buffer4_ref.pimgmtx(&light_sprite, 384.0, 128.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+            buffer4_ref.shader_stack[1].active = false;
+
+            buffer4_ref.shader_stack[2].active = true;
+            buffer4_ref.pimgmtx(&light_sprite, 384.0, 384.0, 0.0, 0.75, 0.75, 0.5, 0.5);
+            buffer4_ref.shader_stack[2].active = false;
+
+            // All done, clear the shaders out since we don't need them anymore
+            buffer4_ref.clear_shaders();
 
         });
     });

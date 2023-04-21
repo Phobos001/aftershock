@@ -1,4 +1,6 @@
-use crate::vector2::Vector2;
+use glam::Vec3A;
+
+use crate::glam::Vec2;
 
 /// Returns a 32-bit float if the value is negative (-1.0), positive (1.0), or zero (0.0)
 pub fn signf(value: f32) -> f32 {
@@ -62,95 +64,28 @@ pub fn mapf(value: f32, low1: f32, high1: f32, low2: f32, high2: f32) -> f32 {
 	low2 + (value - low1) * (high2 - low2) / (high1 - low1)
 }
 
-pub fn intersection(p1_start: Vector2, p1_end: Vector2, p2_start: Vector2, p2_end: Vector2) -> Option<Vector2> {
-	let a1: f32 = p1_end.y - p1_start.y;
-	let b1: f32 = p1_start.x - p1_end.x;
-	let c1: f32 = a1 * p1_start.x + b1 * p1_start.y;
+pub fn point_in_triangle(px: i32, py: i32, x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+	let d1 = sign3i(px, py, x0, y0, x1, y1);
+	let d2 = sign3i(px, py, x1, y1, x2, y2);
+	let d3 = sign3i(px, py, x2, y2, x0, y0);
 
-	let a2: f32 = p2_end.y - p2_start.y;
-	let b2: f32 = p2_start.x - p2_end.x;
-	let c2: f32 = a2 * p2_start.x + b2 * p2_start.y;
+	let has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+	let has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
 
-	let determinant = a1 * b2 - a2 * b1;
-
-	if determinant == 0.0 { // No intersection: Lines are parallel
-		None
-	} else {
-		let point = Vector2::new(
-			(b2 * c1 - b1 * c2) / determinant,
-			(a1 * c2 - a2 * c1) / determinant
-		);
-		Some(point)
-	}
+	let is_inside: bool = !(has_neg && has_pos);
+	is_inside
 }
 
-pub fn intersection_segment(ray_start: Vector2, ray_end: Vector2, line_start: Vector2, line_end: Vector2) -> Option<Vector2> {
+pub fn barycentric(p: (f32, f32), a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> (f32, f32, f32) {
+    let v0 = (b.0 - a.0, b.1 - a.1);
+	let v1 = (c.0 - a.0, c.1 - a.1);
+	let v2 = (p.0 - a.0, p.1 - a.1);
 
-	// Check for any intersection at all
-	let intersection_opt = intersection(ray_start, ray_end, line_start, line_end);
-
-	if intersection_opt.is_some() {
-		let point = intersection_opt.unwrap();
-
-		// First make sure the point is along the segment; between the start and end
-		let error_margin: f32 = 0.00001;
-
-		let dist_line = Vector2::distance(line_start, line_end);
-		let dist_point_to_line_start = Vector2::distance(line_start, point);
-		let dist_point_to_line_end = Vector2::distance(line_end, point);			
-
-		let diff = dist_line - (dist_point_to_line_start + dist_point_to_line_end);
-		let is_on_segment = diff < error_margin && diff > -error_margin;
-
-		// Now make sure the intersected line is actually in front of the ray direction
-		// Otherwise intersections can occur on lines behind the ray and be incorrect
-
-		let is_in_ray_direction = Vector2::dot(
-			Vector2::direction(ray_start, ray_end), 
-			Vector2::direction(ray_start, point)
-		) > 0.0;
-
-		// Finally make sure the point is in the distance of the rays magnitude
-		let is_in_distance = Vector2::distance(ray_start, point) < Vector2::distance(ray_start, ray_end);
-
-		if is_in_ray_direction && is_on_segment && is_in_distance {
-			Some(point)
-		} else {
-			None
-		}
-	} else {
-		None
-	}
-}
-
-pub fn barycentric2(v1x: f32, v1y: f32, v2x: f32, v2y: f32, v3x: f32, v3y: f32) -> (f32, f32, f32) {
-	let b0 = (v2x - v1x, v2y - v1y);
-	let b1 = (v3x - v1x, v3y - v1y);
-	let b2 = (v1x - v2x, v1y - v2y);
-
-    let d00 = dot2(b0.0, b0.1, b0.0, b0.1);
-    let d01 = dot2(b0.0, b0.1, b1.0, b1.1);
-    let d11 = dot2(b1.0, b1.1, b1.0, b1.1);
-    let d20 = dot2(b2.0, b2.1, b0.0, b0.1);
-    let d21 = dot2(b2.0, b2.1, b1.0, b1.1);
-    let denom = d00 * d11 - d01 * d01;
-   	let bv = (d11 * d20 - d01 * d21) / denom;
-    let bw = (d00 * d21 - d01 * d20) / denom;
-	let bu = 1.0 - bv - bw;
-	
-	(bu, bv, bw)
-}
-
-pub fn barycentric(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> (f32, f32, f32) {
-    let v0 = b - a;
-	let v1 = c - a;
-	let v2 = p - a;
-
-    let d00 = Vector2::dot(v0, v0);
-    let d01 = Vector2::dot(v0, v1);
-    let d11 = Vector2::dot(v1, v1);
-    let d20 = Vector2::dot(v2, v0);
-    let d21 = Vector2::dot(v2, v1);
+    let d00 = dot2(v0.0, v0.1, v0.0, v0.1);
+    let d01 = dot2(v0.0, v0.1, v1.0, v1.1);
+    let d11 = dot2(v1.0, v1.1, v1.0, v1.1);
+    let d20 = dot2(v2.0, v2.1, v0.0, v0.1);
+    let d21 = dot2(v2.0, v2.1, v1.0, v1.1);
     let denom = d00 * d11 - d01 * d01;
     let v = (d11 * d20 - d01 * d21) / denom;
     let w = (d00 * d21 - d01 * d20) / denom;

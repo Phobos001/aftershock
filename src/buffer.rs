@@ -1,237 +1,42 @@
 use rayon::prelude::*;
+use glam::*;
+use crate::shader::*;
 
 use crate::color::*;
 use crate::math;
 use crate::partitioned_buffer::PartitionedBuffer;
-use crate::vector2::*;
-use crate::matrix3::*;
 use crate::font::*;
 use crate::math::*;
 
-// Draw Mode Definition
-pub type PSetOp = fn(&mut Buffer, usize, Color);
 
-/// Controls how a Buffer should draw incoming pixels.
-#[derive(Debug, Clone, Copy)]
-pub enum DrawMode {
-    NoOp,
-    NoAlpha,
-    Opaque,
-    Alpha,
-    Addition,
-    Subtraction,
-    Multiply,
-    Divide,
-    ForceTint,
-    InvertedAlpha,
-    InvertedOpaque,
-    InvertedBgAlpha,
-    InvertedBgOpaque,
-    // Collect,
+#[derive(Clone)]
+pub struct BufferShader {
+    pub shader: Box<dyn Shader>,
+    pub active: bool,
+    pub order: u8,
 }
 
-fn pset_noop(buffer: &mut Buffer, idx: usize, color: Color) {
-    buffer.color[idx + 0] = color.r;  // R
-    buffer.color[idx + 1] = color.g;  // G
-    buffer.color[idx + 2] = color.b;  // B
-    buffer.color[idx + 3] = color.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
+impl BufferShader {
+    pub fn new(shader: Box<dyn Shader>, active: bool, order: u8) -> BufferShader {
+        BufferShader { shader, active, order }
+    }
 }
 
-fn pset_noalpha(buffer: &mut Buffer, idx: usize, color: Color) {
-    let color = color * buffer.tint;
-    buffer.color[idx + 0] = color.r;  // R
-    buffer.color[idx + 1] = color.g;  // G
-    buffer.color[idx + 2] = color.b;  // B
-    buffer.color[idx + 3] = color.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw pixels if they are fully opaque, otherwise ignore them.
-fn pset_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a < 255 { return; }
-    let color = color * buffer.tint;
-    buffer.color[idx + 0] = color.r;  // R
-    buffer.color[idx + 1] = color.g;  // G
-    buffer.color[idx + 2] = color.b;  // B
-    buffer.color[idx + 3] = color.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw pixels if they are fully opaque, otherwise ignore them. Forces them to be the tint color.
-/// Useful for flashes or making masks
-fn pset_force_tint(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a < 255 { return; }
-    buffer.color[idx + 0] = buffer.tint.r;  // R
-    buffer.color[idx + 1] = buffer.tint.g;  // G
-    buffer.color[idx + 2] = buffer.tint.b;  // B
-    buffer.color[idx + 3] = buffer.tint.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw pixels and blend them with the background based on the alpha channel
-fn pset_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
-    
-    let fg = color * buffer.tint;
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = Color::blend_fast(fg, bg, buffer.opacity);
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Add incoming and buffer pixels together and draw to screen
-fn pset_addition(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a <= 0 { return; }
-    let fg = color * buffer.tint;
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = Color::blend_fast(fg, bg, buffer.opacity) + bg;
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Multiply incoming pixel with buffer pixel.
-fn pset_multiply(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a <= 0 { return; }
-    let fg = color * buffer.tint;
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = Color::blend_fast(fg.inverted(), bg, buffer.opacity) * bg;
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw inverted copy of incoming pixel with alpha blending
-fn pset_inverted_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a <= 0 { return; }
-    let fg = color* buffer.tint;
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = Color::blend_fast(fg.inverted(), bg, buffer.opacity);
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a < 255 { return; }
-
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = (bg * buffer.tint).inverted();
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_bg_opaque(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a < 255 { return; }
-
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = (bg * buffer.tint).inverted();
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
-
-/// Draw inverted copy of incoming pixel as opaque
-fn pset_inverted_bg_alpha(buffer: &mut Buffer, idx: usize, color: Color) {
-    if color.a < 255 { return; }
-
-    let bg = Color::new(
-        buffer.color[idx + 0],
-        buffer.color[idx + 1],
-        buffer.color[idx + 2],
-        255,
-    );
-
-    let c = Color::blend_fast(bg, (bg * buffer.tint).inverted(), buffer.opacity);
-
-    buffer.color[idx + 0] = c.r;  // R
-    buffer.color[idx + 1] = c.g;  // G
-    buffer.color[idx + 2] = c.b;  // B
-    buffer.color[idx + 3] = c.a;  // A
-    buffer.drawn_pixels_since_clear += 1;
-}
 
 /// Image in memory with operations to modify it. Pixel modification functions are 
 #[derive(Clone)]
 pub struct Buffer {
-    pset_op: PSetOp,
+    pub color: Vec<u8>,
+    pub shader_stack: Vec<BufferShader>,
+
+    pub width: usize,
+    pub height: usize,
 
     // For Partitioned Buffer
     pub offset_x: usize,
     pub offset_y: usize,
-    
-    pub width: usize,
-    pub height: usize,
-    pub color: Vec<u8>,
 
-    pub camera_position: Vector2,
-    pub camera_rotation: f32,
-    pub camera_scale: Vector2,
-    pub camera_matrix: Matrix3,
-
-    pub draw_mode: DrawMode,
-    pub tint: Color,
-    pub opacity: u8,
-
-    pub drawn_pixels_since_clear: u32,
+    pub is_drawing: bool,
 }
 
 impl Buffer {
@@ -244,8 +49,7 @@ impl Buffer {
     pub fn new(width: usize, height: usize) -> Buffer {
         //println!("Buffer: {} x {} x {}, Memory: {}B", width, height, 4, (width * height * 4));
         Buffer {
-            pset_op: pset_opaque,
-
+            shader_stack: Vec::new(),
             offset_x: 0,
             offset_y: 0,
 
@@ -253,16 +57,7 @@ impl Buffer {
             height,
             color: vec![0; width * height * 4],
 
-            camera_position: Vector2::ZERO,
-            camera_rotation: 0.0,
-            camera_scale: Vector2::ONE,
-            camera_matrix: Matrix3::identity(),
-
-            draw_mode: DrawMode::Opaque,
-            tint: Color::WHITE,
-            opacity: 255,
-
-            drawn_pixels_since_clear: 0,
+            is_drawing: true,
         }
     }
 
@@ -276,25 +71,15 @@ impl Buffer {
                 // Convert to atomics for parallelism
 
 				Ok(Buffer {
-                    pset_op: pset_opaque,
-
+                    shader_stack: Vec::new(),
                     width: image.width,
                     height: image.height,
                     color: image.buffer.as_bytes().to_vec(),
 
-                    camera_position: Vector2::ZERO,
-                    camera_rotation: 0.0,
-                    camera_scale: Vector2::ONE,
-                    camera_matrix: Matrix3::identity(),
-
-                    draw_mode: DrawMode::Opaque,
-                    tint: Color::WHITE,
-                    opacity: 255,
-
                     offset_x: 0,
                     offset_y: 0,
 
-                    drawn_pixels_since_clear: 0,
+                    is_drawing: true,
                 })
 			},
 			Err(reason) => {
@@ -311,45 +96,31 @@ impl Buffer {
         self.color = vec![0; width * height * 4];
     }
 
-    /// Sets the Buffers drawing mode for incoming pixels. Should be defined before every drawing operation.
-    /// # Arguments
-    /// * 'mode' - Which drawing function should the Buffer use.
-    pub fn set_draw_mode(&mut self, mode: DrawMode) {
-        match mode {
-            DrawMode::NoOp                  => {self.pset_op = pset_noop;}
-            DrawMode::NoAlpha               => {self.pset_op = pset_noalpha;}
-            DrawMode::Opaque                => {self.pset_op = pset_opaque;},
-            DrawMode::Alpha                 => {self.pset_op = pset_alpha;},
-            DrawMode::Addition              => {self.pset_op = pset_addition;},
-            DrawMode::Multiply              => {self.pset_op = pset_multiply;}
-            DrawMode::ForceTint             => {self.pset_op = pset_force_tint;}
-            DrawMode::InvertedAlpha         => {self.pset_op = pset_inverted_alpha;}
-            DrawMode::InvertedOpaque        => {self.pset_op = pset_inverted_opaque;}
-            DrawMode::InvertedBgOpaque      => {self.pset_op = pset_inverted_bg_opaque;}
-            DrawMode::InvertedBgAlpha       => {self.pset_op = pset_inverted_bg_alpha;}
-            _ => {},
-        }
-    }
-
     pub fn into_partitioned(&self) -> PartitionedBuffer {
-        let mut pr = PartitionedBuffer::new(self.width, self.height, 0);
+        let mut pr = PartitionedBuffer::new(self.width, self.height, 0, PartitionedBuffer::PARALLEL_THRESHOLD_DEFAULT);
         pr.buffer.blit(self, 0, 0);
         pr
     }
 
-    /// Create a copy of a region 
-    /*pub fn blit_copy(&self, x: i32, y: i32, width: usize, height: usize) -> Buffer {
-        let stride = 4;
+    pub fn run_pixel_in_shaders(&mut self, x: i32, y: i32, color: Color, params: ShaderParams) -> (i32, i32, Color) {
+        let mut params = params;
+        params.x = x;
+        params.y = y;
+        params.color = color;
 
-        let mut Buffer: Buffer = Buffer::new(width, height);
-
-        // Go down in rows. i is the current row.
-        self.color.chunks_exact(self.width * 4).enumerate().for_each(|(row_idx, pixel)| {
-            if (row_idx as i32) > y && (row_idx as i32) <= (y + height as i32) {
-                //let sx = i32::clamp(x, 0, self.width)l
+        let mut results: (i32, i32, Color) = (x, y, color);
+        for shader_idx in 0..self.shader_stack.len() {
+            if self.shader_stack[shader_idx].active {
+                if let Some(new_results) = self.shader_stack[shader_idx].shader.shade(self.color.as_slice(), self.width, self.height, params) {
+                    results = new_results;
+                    params.x = results.0;
+                    params.y = results.1;
+                    params.color = results.2;
+                }
             }
-        });
-    }*/
+        }
+        results
+    }
 
     pub fn blit(&mut self, src: &Buffer, x: i32, y: i32) {
         let is_equal_size: bool = self.width == src.width && self.height == src.height;
@@ -401,7 +172,6 @@ impl Buffer {
     /// Clears the frame memory directly, leaving a black screen.
     pub fn clear(&mut self) {
         self.color = vec![0; self.width * self.height * 4];
-        self.drawn_pixels_since_clear = 0;
     }
 
     /// Clears the screen to a color.
@@ -424,8 +194,15 @@ impl Buffer {
                 c[3] = color.a;
             });
         }
+    }
 
-        self.drawn_pixels_since_clear = 0;
+    pub fn add_shader(&mut self, buffer_shader: BufferShader) {
+        self.shader_stack.push(buffer_shader);
+        self.shader_stack.sort_by(|a, b| a.order.cmp(&b.order));
+    }
+
+    pub fn clear_shaders(&mut self) {
+        self.shader_stack.clear();
     }
 
     pub fn tint_buffer(&mut self, color: Color) {
@@ -453,27 +230,10 @@ impl Buffer {
         
     }
 
-    pub fn update_camera(&mut self) {
-        // Camera is usually in the top left corner so we need to change the zoom scaling so it fits in the middle of the screen
-        let camera_offset: Vector2 = Vector2::new(
-            -lerpf(0.0, self.width as f32, 0.5),
-            -lerpf(0.0, self.height as f32, 0.5),
-        );
-
-        let camera_mtx_o = Matrix3::translated(camera_offset);
-        let camera_mtx_r = Matrix3::rotated(self.camera_rotation);
-        let camera_mtx_p = Matrix3::translated(-self.camera_position + Vector2::new(self.width as f32 / 2.0, self.height as f32 / 2.0));
-        let camera_mtx_s = Matrix3::scaled(self.camera_scale);
-
-        // Combine matricies using matrix multiplication
-        self.camera_matrix = camera_mtx_p * camera_mtx_r * camera_mtx_s * camera_mtx_o;
-    }
-
     /// Draws a pixel to the color buffer, using the Buffers set DrawMode. DrawMode defaults to Opaque.
     pub fn pset(&mut self, x: i32, y: i32, color: Color) {
-        self.drawn_pixels_since_clear += 1;
-        //let x = x.rem_euclid(self.width as i32);
-        //let y = y.rem_euclid(self.height as i32);
+        if !self.is_drawing { return; }
+
         let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
 
         let out_left: bool = x < 0;
@@ -484,21 +244,24 @@ impl Buffer {
 
         if out_of_range || out_left || out_right || out_top || out_bottom  { return; }
 
-        // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
-        (self.pset_op)(self, idx, color);
+        self.color[idx + 0] = color.r;
+        self.color[idx + 1] = color.g;
+        self.color[idx + 2] = color.b;
+        self.color[idx + 3] = color.a;
     }
 
     /// Draws a pixel to the color buffer, using the Buffers set DrawMode. DrawMode defaults to Opaque.
     /// This variant of pset has no array bounds protections and will trigger a panic if a pixel is placed
     /// outside of the buffer length.
+    /// This should be used once you are positive a drawing operation will not go out of bounds,
+    /// as this is much more performant.
     pub fn pset_panic_oob(&mut self, x: i32, y: i32, color: Color) {
-        self.drawn_pixels_since_clear += 1;
-
         let idx: usize = ((y * (self.width as i32) + x) * 4) as usize;
 
-
-        // We have to put paraenthesis around the fn() variables or else the compiler will think it's a method.
-        (self.pset_op)(self, idx, color);
+        self.color[idx + 0] = color.r;
+        self.color[idx + 1] = color.g;
+        self.color[idx + 2] = color.b;
+        self.color[idx + 3] = color.a;
     }
 
     /// Gets a color from the color buffer.
@@ -548,7 +311,8 @@ impl Buffer {
         let mut error = dx + dy;
         
         loop {
-            self.pset(x0, y0, color);
+            let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(x0, y0, color, ShaderParams::new(x0, y0, color));
+            self.pset(x_shade, y_shade, color_shade);
             if x0 == x1 && y0 == y1 { break; }
             let e2 = 2 * error;
             if e2 >= dy {
@@ -564,39 +328,6 @@ impl Buffer {
         }
     }
 
-    /// Draws a line across two points using Brensenham Line algorithm from Wikipedia
-    pub fn plinetex(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, u: i32, v: i32, du: i32, dv: i32, buffer: &Buffer) {
-        let (mut x0, mut y0) = (x0, y0);
-        let (mut u, mut v) = (u, v);
-
-        let dx = i32::abs(x1 - x0);
-        let sx = if x0 < x1 {1} else {-1};
-        let dy = -i32::abs(y1 - y0);
-        let sy = if y0 < y1 {1} else {-1};
-        let mut error = dx + dy;
-        
-        loop {
-            let color = buffer.pget_wrap(u, v);
-            self.pset(x0, y0, color);
-
-            if x0 == x1 && y0 == y1 { break; }
-            let e2 = 2 * error;
-            if e2 >= dy {
-                if x0 == x1 { break; }
-                error = error + dy;
-                x0 = x0 + sx;
-            }
-            if e2 <= dx {
-                if y0 == y1 { break; }
-                error = error + dx;
-                y0 = y0 + sy;
-            }
-
-            u += du;
-            v += dv;
-        }
-    }
-    
     /// Draws a rectangle onto the screen. Can either be filled or outlined.
     pub fn prectangle(&mut self, filled: bool, x: i32, y: i32, w: i32, h: i32, color: Color) {
 
@@ -609,7 +340,8 @@ impl Buffer {
 
             for py in y0..y1 {
                 for px in x0..x1 {
-                    self.pset_panic_oob(px, py, color);
+                    let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(px, py, color, ShaderParams::new(px, py, color));
+                    self.pset_panic_oob(x_shade, y_shade, color_shade);
                 }
             }
         } else {
@@ -643,7 +375,8 @@ impl Buffer {
                     let is_inside: bool = !(has_neg && has_pos);
 
                     if is_inside {
-                        self.pset_panic_oob(ix, iy, color);
+                        let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(ix, iy, color, ShaderParams::new(ix, iy, color));
+                        self.pset_panic_oob(x_shade, y_shade, color_shade);
                     }
                 }
             }
@@ -666,7 +399,8 @@ impl Buffer {
             for py in miny..maxy {
                 for px in minx..maxx {
                     if ((px - xc) * (px - xc)) + ((py - yc) * (py - yc)) <= r * r {
-                        self.pset(px, py, color);
+                        let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(px, py, color, ShaderParams::new(px, py, color));
+                        self.pset(x_shade, y_shade, color_shade);
                     }
                 }
             }
@@ -717,7 +451,8 @@ impl Buffer {
                 // Pixel out of bounds
                 if pc.a <= 0 || (px < 0 || px > self.width as i32) || (py < 0 || py > self.height as i32) { continue; }
 
-                self.pset(x + lx, y + ly, pc);
+                let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(x + lx, y + ly, pc, ShaderParams::new(x + lx, y + ly, pc));
+                self.pset(x_shade, y_shade, color_shade);
             }
         }
     }
@@ -726,6 +461,8 @@ impl Buffer {
     pub fn pimgrect(&mut self, image: &Buffer, x: i32, y: i32, rx: i32, ry: i32, rw: i32, rh: i32) {
         let range_x = i32::clamp(rx + rw, 0, self.width as i32);
         let range_y = i32::clamp(ry + rh, 0, self.height as i32);
+
+
         for ly in ry..range_y {
             for lx in rx..range_x {
                 let mlx = lx.rem_euclid(image.width as i32);
@@ -733,8 +470,10 @@ impl Buffer {
 
                 let px: i32 = (x + mlx as i32) - rx as i32;
                 let py: i32 = (y + mly as i32) - ry as i32;
+                let pc = image.pget(mlx as i32, mly as i32);
 
-                self.pset(px, py, image.pget(mlx as i32, mly as i32));
+                let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(px, py, pc, ShaderParams::new(px, py, pc));
+                self.pset(x_shade, y_shade, color_shade);
             }
         }
     }
@@ -753,43 +492,40 @@ impl Buffer {
         let offset_x = -lerpf(0.0, image.width as f32, offset_x);
         let offset_y = -lerpf(0.0, image.height as f32, offset_y);
 
-        let position: Vector2 = Vector2::new(position_x, position_y);
-        let offset: Vector2 = Vector2::new(offset_x, offset_y);
-        let scale: Vector2 = Vector2::new(scale_x, scale_y);
+        let position: Vec2 = Vec2::new(position_x, position_y);
+        let offset: Vec2 = Vec2::new(offset_x, offset_y);
+        let scale: Vec2 = Vec2::new(scale_x, scale_y);
         
 
         // Get sprite matrix setup
-        let mtx_o = Matrix3::translated(offset);
-        let mtx_r = Matrix3::rotated(rotation);
-        let mtx_p = Matrix3::translated(position);
-        let mtx_s = Matrix3::scaled(scale);
+        let mtx_o = Affine2::from_translation(offset);
+        let mtx_r = Affine2::from_angle(rotation);
+        let mtx_p = Affine2::from_translation(position);
+        let mtx_s = Affine2::from_scale(scale);
 
-        let smtx = mtx_p * mtx_r * mtx_s * mtx_o;
-
-        // Combine camera matrix with sprite matrix
-        let cmtx = self.camera_matrix * smtx;
+        let cmtx = mtx_p * mtx_r * mtx_s * mtx_o;
 
         // We have to get the rotated bounding box of the rotated sprite in order to draw it correctly without blank pixels
-        let start_center: Vector2 = cmtx.forward(Vector2::ZERO);
+        let start_center: Vec2 = cmtx.transform_point2(Vec2::ZERO);
         let (mut sx, mut sy, mut ex, mut ey) = (start_center.x, start_center.y, start_center.x, start_center.y);
 
         // Top-Left Corner
-        let p1: Vector2 = cmtx.forward(Vector2::ZERO);
+        let p1: Vec2 = cmtx.transform_point2(Vec2::ZERO);
         sx = f32::min(sx, p1.x); sy = f32::min(sy, p1.y);
         ex = f32::max(ex, p1.x); ey = f32::max(ey, p1.y);
 
         // Bottom-Right Corner
-        let p2: Vector2 = cmtx.forward(Vector2::new(image.width as f32, image.height as f32));
+        let p2: Vec2 = cmtx.transform_point2(Vec2::new(image.width as f32, image.height as f32));
         sx = f32::min(sx, p2.x); sy = f32::min(sy, p2.y);
         ex = f32::max(ex, p2.x); ey = f32::max(ey, p2.y);
 
         // Bottom-Left Corner
-        let p3: Vector2 = cmtx.forward(Vector2::new(0.0, image.height as f32));
+        let p3: Vec2 = cmtx.transform_point2(Vec2::new(0.0, image.height as f32));
         sx = f32::min(sx, p3.x); sy = f32::min(sy, p3.y);
         ex = f32::max(ex, p3.x); ey = f32::max(ey, p3.y);
 
         // Top-Right Corner
-        let p4: Vector2 = cmtx.forward(Vector2::new(image.width as f32, 0.0));
+        let p4: Vec2 = cmtx.transform_point2(Vec2::new(image.width as f32, 0.0));
         sx = f32::min(sx, p4.x); sy = f32::min(sy, p4.y);
         ex = f32::max(ex, p4.x); ey = f32::max(ey, p4.y);
 
@@ -798,6 +534,10 @@ impl Buffer {
         let mut rsy = sy as i32;
         let mut rex = ex as i32+1;
         let mut rey = ey as i32+1;
+
+
+        // Stop if draw area has no pixels
+        if (rex - rsx) == 0 || (rey - rsy) == 0 { return; }
 
         // Sprite isn't even in frame, don't draw anything
         if (rex < 0 || rsx > self.width as i32) && (rey < 0 || rsy > self.height as i32) { return; }
@@ -809,27 +549,33 @@ impl Buffer {
         rex = i32::clamp(rex, 0, self.width as i32);
         rey = i32::clamp(rey, 0, self.height as i32);
 
-        let cmtx_inv = cmtx.clone().inv();
+        let cmtx_inv = cmtx.inverse();
+
+        let mut shader_params: ShaderParams = ShaderParams::new(0, 0, Color::CLEAR);
 
 		// We can finally draw!
         for ly in rsy..rey {
             for lx in rsx..rex {
                 // We have to use the inverted compound matrix (cmtx_inv) in order to get the correct pixel data from the image.
-                let ip: Vector2 = cmtx_inv.forward(Vector2::new(lx as f32, ly as f32));
+                let ip: Vec2 = cmtx_inv.transform_point2(Vec2::new(lx as f32, ly as f32));
+
+                let px = ip.x as i32;
+                let py = ip.y as i32;
 
                 // Ceil the transformed pixel positions to fix the colot pullingg
-                let color: Color = image.pget(f32::ceil(ip.x) as i32, f32::ceil(ip.y) as i32);
+                let pc = image.pget(f32::ceil(ip.x) as i32, f32::ceil(ip.y) as i32);
 
-                // We skip drawing entirely if the alpha is zero.
-                // Otherwise leaves weird grey box
-                if color.a <= 0 { continue; }
-                self.pset(lx as i32, ly as i32, color);
+                let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(px, py, pc, ShaderParams::new(px, py, pc));
+                if color_shade.a <= 0 { continue; }
+                self.pset_panic_oob(x_shade, y_shade, color_shade);
+                
             }
         }
     }
 
     /// Draws a triangle directly to the screen, using a texture.
-    pub fn ptritex_wrap(&mut self,
+    /// The texture will wrap to fit inside the triangle boundries.
+    pub fn ptritex(&mut self,
         x0: i32, y0: i32, 
         x1: i32, y1: i32, 
         x2: i32, y2: i32,
@@ -853,16 +599,155 @@ impl Buffer {
                 let is_inside: bool = !(has_neg && has_pos);
 
                 if is_inside {
-                    // Get where this point would be if transfered to the uv triangle
-
                     // Get interpolation percent between points
                     let uv_x = ix;
                     let uv_y = iy;
+                    let pc = image.pget_wrap(uv_x, uv_y);
 
-                    self.pset(ix, iy, image.pget_wrap(uv_x, uv_y));
+                    let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(ix, iy, pc, ShaderParams::new(ix, iy, pc));
+
+                    self.pset_panic_oob(x_shade, y_shade, color_shade);
                 }
             }
         }
+    }
+
+    /// Draws a triangle directly to the screen, using a texture.
+    /// The texture is mapped using a second triangle in the texture region, called a UV.
+    pub fn ptritex_uv(&mut self,
+        x0: i32, y0: i32, 
+        x1: i32, y1: i32, 
+        x2: i32, y2: i32,
+        u0: f32, v0: f32,
+        u1: f32, v1: f32,
+        u2: f32, v2: f32,
+        image: &Buffer) {
+
+        let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.width as i32);
+        let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.width as i32);
+        let ymin = i32::clamp(i32::min(y0, i32::min(y1, y2)), 0, self.height as i32);
+        let ymax = i32::clamp(i32::max(y0, i32::max(y1, y2)), 0, self.height as i32);
+
+        let uv0: Vec2 = Vec2::new(u0, v0);
+        let uv1: Vec2 = Vec2::new(u1, v1);
+        let uv2: Vec2 = Vec2::new(u2, v2); 
+
+        for iy in ymin..ymax {
+            for ix in xmin..xmax {
+
+                let d1 = math::sign3i(ix, iy, x0, y0, x1, y1);
+                let d2 = math::sign3i(ix, iy, x1, y1, x2, y2);
+                let d3 = math::sign3i(ix, iy, x2, y2, x0, y0);
+
+                let has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                let has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+                let is_inside: bool = !(has_neg && has_pos);
+
+                if is_inside {
+                    // Get weights of this point from the triangle verticies using barycentric coordinates.
+                    let bary: (f32, f32, f32) = barycentric(
+                        (ix as f32, iy as f32), 
+                        (x0 as f32, y0 as f32), 
+                        (x1 as f32, y1 as f32), 
+                        (x2 as f32, y2 as f32)
+                    );
+
+                    // Weigh the UV triangle by the barycentric calculations. This will map our screen triangle to our UV triangle.
+                    let uv0_weighted = uv0 * bary.0;
+                    let uv1_weighted = uv1 * bary.1;
+                    let uv2_weighted = uv2 * bary.2;
+
+                    // Sum the weighted uv coords together to get the texel of the image inside the UV triangle.
+                    let texel: Vec2 = (uv0_weighted + uv1_weighted + uv2_weighted) * Vec2::new(image.width as f32, image.height as f32);
+
+                    let pc = image.pget_wrap(texel.x as i32, texel.y as i32);
+
+                    let (x_shade, y_shade, color_shade) = self.run_pixel_in_shaders(ix, iy, pc, ShaderParams::new(ix, iy, pc));
+                    self.pset_panic_oob(x_shade, y_shade, color_shade);
+                }
+            }
+        }
+    }
+
+    pub fn ptritex_uvw(&mut self,
+        x0: i32, y0: i32, 
+        x1: i32, y1: i32, 
+        x2: i32, y2: i32,
+        u0: f32, v0: f32, w0: f32,
+        u1: f32, v1: f32, w1: f32,
+        u2: f32, v2: f32, w2: f32,
+        image: &Buffer) {
+
+        // Bounding Box
+        let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.width as i32);
+        let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.width as i32);
+        let ymin = i32::clamp(i32::min(y0, i32::min(y1, y2)), 0, self.height as i32);
+        let ymax = i32::clamp(i32::max(y0, i32::max(y1, y2)), 0, self.height as i32);
+
+        // Perspective Correction Inverse Depth
+        let vz0 = 1.0 / w0;
+        let vz1 = 1.0 / w1;
+        let vz2 = 1.0 / w2;
+
+        let uv0: Vec2 = Vec2::new(u0, v0) * vz0;
+        let uv1: Vec2 = Vec2::new(u1, v1) * vz1;
+        let uv2: Vec2 = Vec2::new(u2, v2) * vz2;
+
+        let mut shader_params: ShaderParams = ShaderParams::new(0, 0, Color::CLEAR);
+
+        // Draw triangle
+        // Check 8x8 box corners to see if the
+        for iy in (ymin..ymax) {
+            for ix in (xmin..xmax) {
+                if point_in_triangle(ix, iy, x0, y0, x1, y1, x2, y2) {
+                    // Get weights of this point from the triangle verticies using barycentric coordinates.
+                    // Note: Inlining constants does not improve performance, the compiler might already be doing it
+                    let bary: (f32, f32, f32) = barycentric(
+                        (ix as f32, iy as f32), 
+                        (x0 as f32, y0 as f32), 
+                        (x1 as f32, y1 as f32), 
+                        (x2 as f32, y2 as f32)
+                    ); 
+
+                    // Weigh the UV triangle by the barycentric calculations. This will map our screen triangle to our UV triangle.
+                    let uv0_weighted = uv0 * bary.0;
+                    let uv1_weighted = uv1 * bary.1;
+                    let uv2_weighted = uv2 * bary.2;
+
+                    let vz0_weighted = vz0 * bary.0;
+                    let vz1_weighted = vz1 * bary.1;
+                    let vz2_weighted = vz2 * bary.2;
+
+                    let vz_weighted = vz0_weighted + vz1_weighted + vz2_weighted;
+
+                    // Sum the weighted uv coords together to get the texel of the image inside the UV triangle.
+                    let texel: Vec2 = ((uv0_weighted + uv1_weighted + uv2_weighted) / vz_weighted) * Vec2::new(image.width as f32, image.height as f32);
+                    let mut fc: Color = image.pget(texel.x as i32, texel.y as i32);
+
+
+                    // Required for use in depth buffers
+                    let real_depth: f32 = (w0 * bary.0) + (w1 * bary.1) + (w2 * bary.2);
+
+                    shader_params.x = ix;
+                    shader_params.y = iy;
+                    shader_params.p_f32[0] = texel.x;
+                    shader_params.p_f32[1] = texel.y;
+                    shader_params.p_f32[2] = real_depth;
+                    shader_params.color = fc;
+
+                    for shader_idx in 0..self.shader_stack.len() {
+                        if self.shader_stack[shader_idx].active {
+                            if let Some(result) = self.shader_stack[shader_idx].shader.shade(self.color.as_slice(), self.width, self.height, shader_params) {
+                                fc = result.2;
+                                self.pset_panic_oob(ix, iy, fc);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
     }
 
     /// Draws text directly to the screen using a provided font.
@@ -882,6 +767,7 @@ impl Buffer {
                     let rectw: i32 = font.glyph_width as i32;
                     let recth: i32 = font.glyph_height as i32;
                     
+
                     self.pimgrect(&font.fontimg, x + jumpx as i32, y + jumpy as i32, rectx, recty, rectw, recth);
                     
 

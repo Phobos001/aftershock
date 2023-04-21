@@ -1,20 +1,11 @@
 use crate::buffer::*;
 use crate::color::*;
+use crate::shader;
+use crate::shader::Shader;
 
+use std::rc::Rc;
+use std::sync::Arc;
 use std::thread::*;
-
-use crate::vector2::*;
-
-// If a bounding area in pixels is greater than this number, run in parallel instead
-// Otherwise the extra setup is not worth the effort
-#[derive(Copy, Clone)]
-pub enum BoundingParallelThreshold {
-	VeryHigh	= 8192,
-	High 		= 16384,
-	Medium 		= 32768,
-	Low 		= 65536,
-	VeryLow 	= 131072,
-}
 
 pub enum PartitionScheme {
 	Full,
@@ -33,18 +24,21 @@ pub struct PartitionedBuffer {
 	pub buffer: Buffer,
 	pub partitions: Vec<Buffer>,
 	pub scheme: PartitionScheme,
-	pub threshold: BoundingParallelThreshold,
+	pub threshold: u32,
 }
 
 /// A Buffer that allows for parallel rendering by partioning the image into smaller pieces, usually by how many cores the current CPU has.
 impl PartitionedBuffer {
-	pub fn new(width: usize, height: usize, cores: usize) -> PartitionedBuffer {
+
+	pub const PARALLEL_THRESHOLD_DEFAULT: u32 = 65536;
+
+	pub fn new(width: usize, height: usize, cores: usize, threshold: u32) -> PartitionedBuffer {
 	
 		let mut pr = PartitionedBuffer {
 			buffer: Buffer::new(width, height),
 			partitions:  Vec::new(),
 			scheme: PartitionScheme::Full,
-			threshold: BoundingParallelThreshold::Low,
+			threshold,
 		};
 
 		pr.set_core_limit(cores);
@@ -59,7 +53,7 @@ impl PartitionedBuffer {
 				let buffer_new: Vec<u8> =  image.buffer.as_bytes().to_vec();
                 use rgb::*;
 
-				let mut pr = PartitionedBuffer::new(image.width, image.height, 0);
+				let mut pr = PartitionedBuffer::new(image.width, image.height, 0, PartitionedBuffer::PARALLEL_THRESHOLD_DEFAULT);
 				pr.buffer.color = buffer_new;
 				pr.generate_partitions();
 
@@ -67,18 +61,9 @@ impl PartitionedBuffer {
 			},
 			Err(reason) => {
 				println!("ERROR - IMAGE: Could not load {} | {}", path_to, reason);
-				PartitionedBuffer::new(1, 1, 1)
+				PartitionedBuffer::new(1, 1, 1, PartitionedBuffer::PARALLEL_THRESHOLD_DEFAULT)
 			}
 		}
-	}
-
-	pub fn get_pixels_since_clear(&self) -> u32 {
-		let mut total: u32 = 0;
-		total += self.buffer.drawn_pixels_since_clear;
-		for part in &self.partitions {
-			total += part.drawn_pixels_since_clear;
-		}
-		total
 	}
 
 	pub fn clear(&mut self) {
@@ -92,6 +77,27 @@ impl PartitionedBuffer {
 		self.buffer.clear_color(color);
 		for part in &mut self.partitions {
 			part.clear_color(color);
+		}
+	}
+
+	pub fn enable_drawing(&mut self) {
+		self.buffer.is_drawing = true;
+		for part in &mut self.partitions {
+			part.is_drawing = true;
+		}
+	}
+
+	pub fn disable_drawing(&mut self) {
+		self.buffer.is_drawing = false;
+		for part in &mut self.partitions {
+			part.is_drawing = false;
+		}
+	}
+
+	pub fn add_shader(&mut self, shader: BufferShader) {
+		self.buffer.add_shader(shader.clone());
+		for part in &mut self.partitions {
+			part.add_shader(shader.clone());
 		}
 	}
 
@@ -125,55 +131,6 @@ impl PartitionedBuffer {
 		self.generate_partitions();
 	}
 
-	pub fn set_draw_mode(&mut self, mode: DrawMode) {
-		self.buffer.set_draw_mode(mode);
-		for part in &mut self.partitions {
-			part.set_draw_mode(mode);
-		}
-	}
-
-	pub fn set_tint(&mut self, color: Color) {
-		self.buffer.tint = color;
-		for part in &mut self.partitions {
-			part.tint = color;
-		}
-	}
-
-	pub fn set_opacity(&mut self, opacity: u8) {
-		self.buffer.opacity = opacity;
-		for part in &mut self.partitions {
-			part.opacity = opacity;
-		}
-	}
-
-	pub fn set_camera_position(&mut self, x: f32, y: f32) {
-		self.buffer.camera_position = Vector2::new(x, y);
-		for part in &mut self.partitions {
-			part.camera_position = Vector2::new(x, y);
-		}
-	}
-
-	pub fn set_camera_rotation(&mut self, rotation: f32) {
-		self.buffer.camera_rotation = rotation;
-		for part in &mut self.partitions {
-			part.camera_rotation = rotation;
-		}
-	}
-
-	pub fn set_camera_scale(&mut self, x: f32, y: f32) {
-		self.buffer.camera_scale = Vector2::new(x, y);
-		for part in &mut self.partitions {
-			part.camera_scale = Vector2::new(x, y);
-		}
-	}
-
-	pub fn update_camera(&mut self) {
-		self.buffer.update_camera();
-		for part in &mut self.partitions {
-			part.update_camera();
-		}
-	}
-
 	pub fn resize(&mut self, width: usize, height: usize) {
 		self.buffer.resize(width, height);
 		self.generate_partitions();
@@ -204,7 +161,7 @@ impl PartitionedBuffer {
 		let total_area = width * height;
 
 		// Run in parallel
-		if filled && total_area >= self.threshold as i32 {
+		if filled && self.threshold != 0 && total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
@@ -241,7 +198,7 @@ impl PartitionedBuffer {
 		let total_area = std::f32::consts::PI * (radius * radius) as f32 ;
 
 		// Run in parallel
-		if total_area >= self.threshold as i32 as f32 {
+		if self.threshold != 0 && total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
@@ -284,7 +241,7 @@ impl PartitionedBuffer {
 		let total_area = (width as i32) * (height as i32);
 
 		// Run in parallel
-		if total_area >= self.threshold as i32 {
+		if self.threshold != 0 && total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
@@ -328,7 +285,7 @@ impl PartitionedBuffer {
 		let total_area = (width as i32) * (height as i32);
 
 		// Run in parallel
-		if total_area >= self.threshold as i32 {
+		if self.threshold != 0 && total_area >= self.threshold as i32 {
 			scope(|s| {
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
 			
@@ -372,7 +329,7 @@ impl PartitionedBuffer {
 		let total_area = (width as f32 * scale_x) * (height as f32 * scale_y);
 
 		// Run in parallel
-		if total_area >= self.threshold as i32 as f32 {
+		if self.threshold != 0 && total_area >= self.threshold as i32 as f32 {
 			scope(|s| {
 
 				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
@@ -406,6 +363,74 @@ impl PartitionedBuffer {
 			
 		} else {
 			self.buffer.pimgmtx(&image, x, y, rotation, scale_x, scale_y, offset_x, offset_y);
+		}
+		
+	}
+
+	pub fn ptritex_uvw(&mut self, x0: i32, y0: i32, 
+        x1: i32, y1: i32, 
+        x2: i32, y2: i32,
+        u0: f32, v0: f32, w0: f32,
+        u1: f32, v1: f32, w1: f32,
+        u2: f32, v2: f32, w2: f32,
+        image: &Buffer) {
+
+		let xmin = i32::clamp(i32::min(x0, i32::min(x1, x2)), 0, self.buffer.width as i32);
+		let xmax = i32::clamp(i32::max(x0, i32::max(x1, x2)), 0, self.buffer.width as i32);
+		let ymin = i32::clamp(i32::min(y0, i32::min(y1, y2)), 0, self.buffer.height as i32);
+		let ymax = i32::clamp(i32::max(y0, i32::max(y1, y2)), 0, self.buffer.height as i32);
+
+		let bb_width: i32 = xmax - xmin;
+		let bb_height: i32 = ymax - ymin;
+
+		let total_area = bb_width as u32 * bb_height as u32;
+
+		// Run in parallel
+		if self.threshold != 0 && total_area >= self.threshold {
+			scope(|s| {
+
+				let mut join_handles: Vec<ScopedJoinHandle<&mut Buffer>> = Vec::new();
+
+				// First pass: Find all regions that contain the image
+				for part in &mut self.partitions {
+					let rx0 = x0 - part.offset_x as i32;
+					let ry0 = y0 - part.offset_y as i32;
+					let rx1 = x1 - part.offset_x as i32;
+					let ry1 = y1 - part.offset_y as i32;
+					let rx2 = x2 - part.offset_x as i32;
+					let ry2 = y2 - part.offset_y as i32;
+					
+					let handle = s.spawn( move || {
+						
+						part.ptritex_uvw(
+							rx0, ry0, rx1, ry1, rx2, ry2,
+							u0, v0, w0,
+							u1, v1, w1,
+							u2, v2, w2, image
+						);
+	
+						part
+					});
+					join_handles.push(handle);
+				}
+
+				for handle in join_handles {
+					let part_return = handle.join();
+					if part_return.is_ok() {
+						let part = part_return.unwrap();
+						self.buffer.blit(&part, part.offset_x as i32, part.offset_y as i32);
+					} else {
+						println!("ERROR - THREAD PANIC: Partition failed in ptritex_uvw function!")
+					}
+				}
+			})
+			
+		} else {
+			self.buffer.ptritex_uvw(x0, y0, x1, y1, x2, y2,
+				u0, v0, w0,
+				u1, v1, w1,
+				u2, v2, w2, image
+			);
 		}
 		
 	}

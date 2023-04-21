@@ -1,8 +1,8 @@
 use aftershock::buffer::Buffer;
-use aftershock::vector2::*;
 use aftershock::math::*;
 
 use dashmap::*;
+use glam::Vec2;
 
 use crate::aabb::*;
 use crate::controls::*;
@@ -63,7 +63,7 @@ fn _draw_wall_prototype_yellow(buffer: &mut Buffer, x: i32, y: i32) {
 
 
 pub struct GameState {
-    pub camera_position: Vector2,
+    pub camera_position: Vec2,
 
     pub player: AABB,
     pub is_grabbing_ceiling: bool,

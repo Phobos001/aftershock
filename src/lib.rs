@@ -5,11 +5,13 @@
 
 #![crate_name = "aftershock"]
 #![crate_type = "lib"]
-#![feature(portable_simd)]
+
+pub extern crate glam;
 
 // Core
 pub mod buffer;
 pub mod partitioned_buffer;
+pub mod shader;
 
 // Assets
 pub mod font;
@@ -18,9 +20,10 @@ pub mod font;
 pub mod math;
 pub mod color;
 
-// Math 2D
-pub mod vector2;
-pub mod matrix3;
+// Math 3D;
+pub mod three_dee;
+
+
 
 // Profiling shorthand
 pub fn timestamp() -> f64 {

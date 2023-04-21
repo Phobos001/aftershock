@@ -11,7 +11,7 @@ use std::fs::File;
 /// All bitmap fonts need a glyph index that's in order of left-to-right, top-to-bottom of the glyphs used
 /// in the font image. The glyph index is used as a lookup table to find the corrisponding glyph subimage.
 ///
-/// For example, a simple five glyph image in the order of 'N', 'O', 'W', 'A', 'Y' must have a glyphidx
+/// For example, a simple five glyph image in the order of 'N', 'O', 'W', ', 'Y' must have a glyphidx
 /// of "NOWAY" for it to print your text correctly.
 /// 
 /// The glyph width and height tells the font how big the sections are for the glyphs in the image.
@@ -30,7 +30,7 @@ pub struct Font {
 impl Font {
 
 	/// Load a font image from disk. The order
-	pub fn new(path_image: &str, glyphidxstr: &str, glyph_width: usize, glyph_height: usize, glyph_spacing: i32) -> Result<Font, String> {
+	pub fn new(path_image: & str, glyphidxstr: & str, glyph_width: usize, glyph_height: usize, glyph_spacing: i32) -> Result<Font, String> {
 
 		let glyphidx = glyphidxstr.to_string().chars().collect();
 		let glyphidx_sizes: Vec<FontGlyph> = Vec::new();

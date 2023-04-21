@@ -1,16 +1,17 @@
 extern crate device_query;
 use device_query::*;
 
-use crate::engine::RebuiltEngine;
+use crate::engine::ThreeDeeEngine;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ControlKeys {
-    TurnLeft = 0,
-    TurnRight = 1,
-    MoveForward = 2,
-    MoveBackward = 3,
-    StrafeLeft = 4,
-    StrafeRight = 5,
+    MoveForward = 0,
+    MoveBackward = 1,
+    MoveLeft = 2,
+    MoveRight = 3,
+    MoveUp = 4,
+    MoveDown = 5,
+
 
     Pause = 28,
     MouseButtonLeft = 29,
@@ -33,7 +34,7 @@ impl Controls {
             input_last: 0,
             device_state: device_query::DeviceState::new(),
 
-            mouse_position: (RebuiltEngine::RENDER_WIDTH as i32 / 2, RebuiltEngine::RENDER_HEIGHT as i32 / 2),
+            mouse_position: (ThreeDeeEngine::RENDER_WIDTH as i32 / 2, ThreeDeeEngine::RENDER_HEIGHT as i32 / 2),
         }
     }
 
@@ -64,14 +65,12 @@ impl Controls {
         
         for key in keys.iter() {
             match key {
-
-                Keycode::A      => { self.input_current  |= 1 << ControlKeys::StrafeLeft as u32; },
-                Keycode::D      => { self.input_current  |= 1 << ControlKeys::StrafeRight as u32; },
+                Keycode::A      => { self.input_current  |= 1 << ControlKeys::MoveLeft as u32; },
+                Keycode::D      => { self.input_current  |= 1 << ControlKeys::MoveRight as u32; },
                 Keycode::W      => { self.input_current  |= 1 << ControlKeys::MoveForward as u32; },
                 Keycode::S      => { self.input_current  |= 1 << ControlKeys::MoveBackward as u32; },
-
-                Keycode::Left   => { self.input_current  |= 1 << ControlKeys::TurnLeft as u32; },
-                Keycode::Right  => { self.input_current  |= 1 << ControlKeys::TurnRight as u32; },
+                Keycode::Q      => { self.input_current  |= 1 << ControlKeys::MoveUp as u32; },
+                Keycode::E      => { self.input_current  |= 1 << ControlKeys::MoveDown as u32; },
 
                 Keycode::Escape => { self.input_current  |= 1 << ControlKeys::Pause as u32; }
                 _ => {},

@@ -1,6 +1,6 @@
 [package]
 name    = "aftershock"
-version = "0.0.19"
+version = "0.0.20"
 authors = ["Keinan Powers / Phobos001"]
 edition = "2021"
 catagories = "graphics"
@@ -17,18 +17,21 @@ crate-type = ["lib"]
 
 [dependencies]
 lodepng = "3.7.2" # load pngs for Image to Vec<u8>
-rgb = "0.8.34" # helps the above
+rgb = "0.8.36" # helps the above
 rusttype = "0.9.3" # TTF Rendering into Image
 num_cpus = "1.15.0"
-rayon = "1.6.1"
+rayon = "1.7.0"
+glam = "0.23.0"
+dyn-clone = "1.0.11"
 
 [dev-dependencies]
 sdl2 = {version = "0.35.2", features = ["static-link", "use-pkgconfig"] }
 device_query = "1.1.2" # Controls
 alea = "0.2.2" # RNG
-soloud = "1.0.2" # Audio
+# soloud = "1.0.2" # Audio
 dashmap = {version = "5.4.0", features = ["serde", "rayon"]} # Assets
-mlua = {version = "0.8.7", features = ["luajit", "vendored"]} # Framework Scripting
+# mlua = {version = "0.8.8", features = ["luajit", "vendored"]} # Framework Scripting
+
 
 # Memory leak in earlier version, not used by aftershock
 bumpalo = "3.12.0"
@@ -50,3 +53,6 @@ rev = "261c458af6e3eed5d099144aff95d2b5035f656b"
 
 [package.metadata.vcpkg.target]
 x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }
+
+[registries.crates-io]
+protocol = "sparse"
